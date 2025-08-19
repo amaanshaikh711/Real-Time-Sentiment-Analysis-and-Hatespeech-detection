@@ -1,0 +1,134 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  <section class="home-main">
+
+    <!-- Hero Section -->
+    <div class="home-content glass-card">
+      <div class="home-icon" style="display: flex; justify-content: center; margin-bottom: 1rem;">
+        <script src="https://unpkg.com/@lottiefiles/dotlottie-wc@0.6.2/dist/dotlottie-wc.js" type="module"></script>
+        <dotlottie-wc src="https://lottie.host/8cac678c-196f-4239-b774-9362464e2549/545Cy2vckM.lottie"
+                       speed="1" autoplay loop></dotlottie-wc>
+        <!-- <dotlottie-wc src="https://lottie.host/078fca8f-e91f-4fcd-8a39-bc6f1a51525b/h1kyrCHp9X.lottie"
+                       speed="1" autoplay loop></dotlottie-wc> -->
+      </div>
+      <h2>Welcome to HateSense AI</h2>
+      <p>
+        HateSense AI leverages cutting-edge artificial intelligence to detect, analyze, and combat hate speech on social media platforms like Twitter. Our mission is to foster safer, more inclusive online communities by providing accurate, real-time insights while respecting user privacy.
+      </p>
+      <a href="{{ url_for('input_page') }}" class="btn btn-glow">
+        Start Analyzing Now <span class="down-arrow">⬇️</span>
+      </a>
+    </div>
+
+    <!-- Real-Time Analytics Section -->
+    <section class="flashcards-section">
+      <h2 class="section-title"><i class="fas fa-chart-bar"></i> Real-Time Hate Speech Analytics</h2>
+      <div class="flashcards-container">
+        <div class="flashcard glass-card glow-on-hover">
+          <h3>Sentiment Classification</h3>
+          <p>Hate / Offensive / Neutral / Positive</p>
+        </div>
+        <div class="flashcard glass-card glow-on-hover">
+          <h3>Hate Category</h3>
+          <p>Racism, Religion-based, Gender, etc.</p>
+        </div>
+        <div class="flashcard glass-card glow-on-hover">
+          <h3>Toxicity Score</h3>
+          <p>Confidence level of harmful intent</p>
+        </div>
+        <div class="flashcard glass-card glow-on-hover">
+          <h3>Visual Insights</h3>
+          <p>Interactive pie and bar graphs of overall dataset</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tweet Stats -->
+    <section class="flashcards-section">
+      <h2 class="section-title"><i class="fas fa-chart-line"></i> Insights from 1M+ Tweets Analyzed</h2>
+      <div class="flashcards-container">
+        <div class="flashcard glass-card glow-on-hover"><p><strong>37%</strong> Hate/Offensive</p></div>
+        <div class="flashcard glass-card glow-on-hover"><p><strong>53%</strong> Neutral</p></div>
+        <div class="flashcard glass-card glow-on-hover"><p><strong>10%</strong> Positive</p></div>
+      </div>
+    </section>
+
+     <!-- How It Works -->
+  <section class="flashcards-section" style="margin-top: 2.5rem;">
+    <h2 class="section-title"><i class="fas fa-cogs"></i> How It Works</h2>
+    <div class="flashcards-container" style="display: flex; flex-wrap: wrap; gap: 1.5rem; justify-content: center;">
+      <div class="flashcard glass-card glow-on-hover" style="flex: 1 1 180px; max-width: 220px; min-width: 180px; min-height: 120px; display: flex; align-items: center; justify-content: center; text-align: center;">
+        <p style="font-size: 1rem; margin: 0;"><strong>Step 1:</strong> Submit your text for analysis.</p>
+      </div>
+      <div class="flashcard glass-card glow-on-hover" style="flex: 1 1 180px; max-width: 220px; min-width: 180px; min-height: 120px; display: flex; align-items: center; justify-content: center; text-align: center;">
+        <p style="font-size: 1rem; margin: 0;"><strong>Step 2:</strong> Our NLP model cleans and processes the text.</p>
+      </div>
+      <div class="flashcard glass-card glow-on-hover" style="flex: 1 1 180px; max-width: 220px; min-width: 180px; min-height: 120px; display: flex; align-items: center; justify-content: center; text-align: center;">
+        <p style="font-size: 1rem; margin: 0;"><strong>Step 3:</strong> AI detects hate categories and sentiment.</p>
+      </div>
+      <div class="flashcard glass-card glow-on-hover" style="flex: 1 1 180px; max-width: 220px; min-width: 180px; min-height: 120px; display: flex; align-items: center; justify-content: center; text-align: center;">
+        <p style="font-size: 1rem; margin: 0;"><strong>Step 4:</strong> Results are shown in a clean, user-friendly format.</p>
+      </div>
+    </div>
+  </section>
+
+   <!-- Who Can Use -->
+   <section class="flashcards-section" style="margin-top: 2.5rem;">
+    <h2 class="section-title"><i class="fas fa-users"></i> Who Can Use HateSense AI?</h2>
+    <div class="flashcards-container" style="display: flex; flex-wrap: wrap; gap: 1.5rem; justify-content: center;">
+      <div class="flashcard glass-card glow-on-hover" style="flex: 1 1 180px; max-width: 220px; min-width: 180px; min-height: 80px; display: flex; align-items: center; justify-content: center; text-align: center;">
+        <p style="font-size: 1rem; margin: 0;">Journalists & Media Analysts</p>
+      </div>
+      <div class="flashcard glass-card glow-on-hover" style="flex: 1 1 180px; max-width: 220px; min-width: 180px; min-height: 80px; display: flex; align-items: center; justify-content: center; text-align: center;">
+        <p style="font-size: 1rem; margin: 0;">NGOs & Human Rights Groups</p>
+      </div>
+      <div class="flashcard glass-card glow-on-hover" style="flex: 1 1 180px; max-width: 220px; min-width: 180px; min-height: 80px; display: flex; align-items: center; justify-content: center; text-align: center;">
+        <p style="font-size: 1rem; margin: 0;">Law Enforcement & Cyber Cells</p>
+      </div>
+      <div class="flashcard glass-card glow-on-hover" style="flex: 1 1 180px; max-width: 220px; min-width: 180px; min-height: 80px; display: flex; align-items: center; justify-content: center; text-align: center;">
+        <p style="font-size: 1rem; margin: 0;">Educators & Researchers</p>
+      </div>
+    </div>
+  </section>
+
+    <!-- Features -->
+    <h2 class="services-heading" style="margin-top: 3%;
+    margin-bottom: -5%;">
+    <i class="fas fa-cogs"></i> Explore Our Features</h2>
+    <section class="services-section">
+
+      
+
+      <section class="privacy-section glass-card">
+        <h2><i class="fas fa-lock"></i> Privacy First, Always</h2>
+        <p>We do not collect any personal user information. All entries are processed anonymously, ensuring your data stays yours.</p>
+      </section>
+
+
+      <section class="testimonial-section glass-card">
+        <h2><i class="fas fa-comment-dots"></i> User Testimonial</h2>
+        <blockquote>
+          "HateSense AI gave me clarity on the kind of toxic language that spreads on Twitter. It's a much-needed tool for content moderation."
+          <footer>— Priya Mehta, Social Media Analyst</footer>
+        </blockquote>
+      </section>
+
+      <section class="newsletter-section glass-card">
+        <h2><i class="fas fa-envelope"></i> Stay Updated</h2>
+        <p>Subscribe to our newsletter for:</p>
+        <ul>
+          <li>Monthly trend reports</li>
+          <li>New hate detection model releases</li>
+          <li>API access and upcoming features</li>
+        </ul>
+        <a href="#" class="btn btn-glow">Subscribe Now</a>
+      </section>
+
+    </section>
+  </section>
+  
+
+<!-- Footer removed to avoid duplication with base.html footer -->
+
+{% endblock %}

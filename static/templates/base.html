@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HateSense AI</title>
+  
+  <!-- Favicon -->
+  <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+  <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32x32.png') }}">
+  <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicon-16x16.png') }}">
+  <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
+  <link rel="manifest" href="{{ url_for('static', filename='site.webmanifest') }}">
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/home-style.css') }}">
+  <style>
+    .transition-all {
+      transition: all 0.3s ease;
+    }
+    .nav-link {
+      position: relative;
+      transition: all 0.3s ease;
+    }
+    .nav-link::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      bottom: -4px;
+      width: 0%;
+      height: 2px;
+      background-color: #fff;
+      transition: width 0.3s ease;
+    }
+    .nav-link:hover::after {
+      width: 100%;
+    }
+    .nav-link:hover {
+      transform: translateY(-2px) scale(1.05);
+      text-shadow: 0px 2px 8px rgba(255,255,255,0.4);
+    }
+    .profile-btn {
+      transition: all 0.3s ease;
+      box-shadow: 0px 4px 15px rgba(0,0,0,0.3);
+      transform: perspective(500px) translateZ(0);
+    }
+    .profile-btn:hover {
+      transform: perspective(500px) translateZ(10px) scale(1.05);
+      box-shadow: 0px 6px 20px rgba(0,0,0,0.4);
+    }
+    header {
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+    
+    /* Global theme transitions */
+    * {
+      transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+    
+    /* Light mode text color adjustments */
+    [data-theme="light"] {
+      color: var(--text-primary);
+    }
+    
+    [data-theme="light"] .text-white {
+      color: var(--text-primary) !important;
+    }
+    
+    [data-theme="light"] header {
+      color: var(--text-primary);
+    }
+    #menu {
+      transition: max-height 0.4s ease, opacity 0.4s ease;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Mobile Navbar (hidden on desktop) -->
+  <nav class="mobile-navbar">
+    <div class="logo">HateSense AI</div>
+    <button class="mobile-menu-toggle" id="mobileMenuToggle">
+      <i class="fas fa-bars"></i>
+    </button>
+  </nav>
+
+  <!-- Mobile Menu Dropdown -->
+  <div class="mobile-menu" id="mobileMenu">
+    <div class="nav-links">
+      <a href="{{ url_for('home') }}" class="nav-link">🏠 Home</a>
+      <a href="{{ url_for('input_page') }}" class="nav-link">🔍 Analyzer</a>
+      <a href="{{ url_for('about') }}" class="nav-link">📘 About</a>
+      <a href="{{ url_for('contact') }}" class="nav-link">📞 Contact</a>
+      <a href="{{ url_for('dashboard') }}" class="nav-link">📊 Dashboard</a>
+      <a href="{{ url_for('blog') }}" class="nav-link">📰 Blog</a>
+    </div>
+  </div>
+
+  <!-- Desktop Navbar -->
+  {% include 'navbar.html' %}
+
+  <!-- Main layout: sidebar and main column as siblings in a flex row -->
+  <div id="layoutWrapper" class="layout flex h-screen">
+    <!-- Sidebar (hidden on mobile) -->
+    {% include 'sidebar.html' %}
+
+    <!-- Main Column: content + footer -->
+    <div class="main-column flex flex-col flex-1 min-h-0">
+      <main id="main-content" class="flex-1 p-2 transition-all duration-300 ml-56 overflow-y-auto">
+        {% block content %}{% endblock %}
+      </main>
+      {% include 'footer.html' %}
+    </div>
+  </div>
+
+  <!-- Sidebar Toggle Script -->
+  <script>
+    const toggleBtn = document.getElementById('toggleSidebar');
+    const sidebar = document.getElementById('sidebar');
+    const mainContent = document.getElementById('main-content');
+    const layoutWrapper = document.getElementById('layoutWrapper');
+
+    if (toggleBtn && sidebar && mainContent && layoutWrapper) {
+      toggleBtn.addEventListener('click', () => {
+        // Toggle sidebar width
+        if (sidebar.classList.contains('w-56')) {
+          sidebar.classList.remove('w-56');
+          sidebar.classList.add('w-16');
+          mainContent.classList.remove('ml-56');
+          mainContent.classList.add('ml-16');
+          layoutWrapper.classList.add('sidebar-collapsed');
+        } else {
+          sidebar.classList.remove('w-16');
+          sidebar.classList.add('w-56');
+          mainContent.classList.remove('ml-16');
+          mainContent.classList.add('ml-56');
+          layoutWrapper.classList.remove('sidebar-collapsed');
+        }
+        // Hide/show labels in sidebar
+        document.querySelectorAll('.sidebar-label').forEach(label => {
+          label.classList.toggle('hidden');
+        });
+      });
+    }
+
+    // Mobile menu toggle
+    const mobileMenuToggle = document.getElementById('mobileMenuToggle');
+    const mobileMenu = document.getElementById('mobileMenu');
+
+    if (mobileMenuToggle && mobileMenu) {
+      mobileMenuToggle.addEventListener('click', () => {
+        mobileMenu.classList.toggle('active');
+        
+        // Toggle icon
+        const icon = mobileMenuToggle.querySelector('i');
+        if (mobileMenu.classList.contains('active')) {
+          icon.classList.remove('fa-bars');
+          icon.classList.add('fa-times');
+        } else {
+          icon.classList.remove('fa-times');
+          icon.classList.add('fa-bars');
+        }
+      });
+
+      // Close mobile menu when clicking outside
+      document.addEventListener('click', (e) => {
+        if (!mobileMenuToggle.contains(e.target) && !mobileMenu.contains(e.target)) {
+          mobileMenu.classList.remove('active');
+          const icon = mobileMenuToggle.querySelector('i');
+          icon.classList.remove('fa-times');
+          icon.classList.add('fa-bars');
+        }
+      });
+
+      // Close mobile menu when clicking on a link
+      mobileMenu.querySelectorAll('.nav-link').forEach(link => {
+        link.addEventListener('click', () => {
+          mobileMenu.classList.remove('active');
+          const icon = mobileMenuToggle.querySelector('i');
+          icon.classList.remove('fa-times');
+          icon.classList.add('fa-bars');
+        });
+      });
+    }
+
+    // Mobile menu toggle (legacy)
+    const menuBtn = document.getElementById('menu-btn');
+    const menu = document.getElementById('menu');
+
+    if (menuBtn && menu) {
+      menuBtn.addEventListener('click', () => {
+        if (menu.classList.contains('max-h-0')) {
+          menu.classList.remove('max-h-0', 'opacity-0');
+          menu.classList.add('max-h-screen', 'opacity-100');
+        } else {
+          menu.classList.remove('max-h-screen', 'opacity-100');
+          menu.classList.add('max-h-0', 'opacity-0');
+        }
+      });
+    }
+
+    // Theme Toggle Functionality
+    const themeToggle = document.getElementById('themeToggle');
+    const sunIcon = document.getElementById('sunIcon');
+    const moonIcon = document.getElementById('moonIcon');
+    const html = document.documentElement;
+
+    // Function to set theme
+    function setTheme(theme) {
+      html.setAttribute('data-theme', theme);
+      localStorage.setItem('theme', theme);
+      
+      // Update icons
+      if (theme === 'light') {
+        sunIcon.classList.add('hidden');
+        moonIcon.classList.remove('hidden');
+      } else {
+        sunIcon.classList.remove('hidden');
+        moonIcon.classList.add('hidden');
+      }
+    }
+
+    // Function to get current theme
+    function getCurrentTheme() {
+      return localStorage.getItem('theme') || 'dark';
+    }
+
+    // Initialize theme on page load
+    function initializeTheme() {
+      const savedTheme = getCurrentTheme();
+      setTheme(savedTheme);
+    }
+
+    // Theme toggle event listener
+    if (themeToggle) {
+      themeToggle.addEventListener('click', () => {
+        const currentTheme = getCurrentTheme();
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        setTheme(newTheme);
+      });
+    }
+
+    // Initialize theme when DOM is loaded
+    document.addEventListener('DOMContentLoaded', initializeTheme);
+  </script>
+</body>
+</html>

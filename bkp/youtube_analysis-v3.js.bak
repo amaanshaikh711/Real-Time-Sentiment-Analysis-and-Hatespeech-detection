@@ -1,0 +1,221 @@
+// youtube_analysis.js — robust + footer-hide + colors
+let sentimentChart = null;
+let hateChart = null;
+let timelineChart = null;
+
+function getCSSVariable(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+function hideFooter() {
+  try {
+    const f = document.querySelector('footer') || document.querySelector('.site-footer');
+    if (f) {
+      f.dataset._origDisplay = f.style.display || '';
+      f.style.display = 'none';
+    }
+  } catch (e) { console.warn('hideFooter err', e); }
+}
+function showFooter() {
+  try {
+    const f = document.querySelector('footer') || document.querySelector('.site-footer');
+    if (f) {
+      f.style.display = f.dataset._origDisplay || '';
+      delete f.dataset._origDisplay;
+    }
+  } catch (e) { console.warn('showFooter err', e); }
+}
+
+// Loader + form handling
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('youtube-analysis-form');
+  const loader = document.getElementById('loading-animation');
+  const button = form ? form.querySelector('button[type="submit"]') : null;
+
+  if (form && loader) {
+    form.addEventListener('submit', () => {
+      // show loader + hide footer so footer doesn't overlap page
+      loader.style.display = 'flex';
+      hideFooter();
+      if (button) {
+        button.disabled = true;
+        button.setAttribute('data-original-text', button.innerHTML);
+        button.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Analyzing...`;
+      }
+    });
+  }
+
+  // When page loads, if results present, init charts
+  const el = document.getElementById('analysis-data');
+  if (el) {
+    try {
+      // Defensive: try to repair if server failed to escape something
+      let txt = el.textContent || el.innerText || "";
+      // If the server didn't escape closing script tags, we've already patched backend,
+      // but keep a fallback: replace literal newlines to be safe
+      txt = txt.replace(/\r/g, '\\r').replace(/\n/g, '\\n');
+      const analysisData = JSON.parse(txt);
+      initializeCharts(analysisData);
+    } catch (e) {
+      console.error('Failed to parse analysis data', e);
+      // debug helper: show short preview of the text so we can inspect quickly
+      try {
+        const el2 = document.getElementById('analysis-data');
+        console.log('analysis-data preview:', (el2 && el2.textContent) ? el2.textContent.slice(0,1000) : 'no data');
+      } catch (e2) { /* ignore */ }
+    } finally {
+      // ensure footer visible (analysis finished if page already has results)
+      showFooter();
+      // restore analyze button if any
+      const b = document.querySelector('#youtube-analysis-form button[type="submit"]');
+      if (b && b.dataset && b.dataset.originalText) {
+        b.innerHTML = b.dataset.originalText;
+        b.disabled = false;
+      }
+    }
+  }
+
+  // "Show more comments"
+  const showMoreBtn = document.getElementById('show-more-comments');
+  if (showMoreBtn) {
+    showMoreBtn.addEventListener('click', () => {
+      const hidden = document.querySelectorAll('.hidden-comment');
+      const batch = Array.from(hidden).slice(0, 10);
+      batch.forEach(el => (el.style.display = 'block', el.classList.remove('hidden-comment')));
+      if (document.querySelectorAll('.hidden-comment').length === 0) {
+        showMoreBtn.style.display = 'none';
+      }
+    });
+  }
+});
+
+// Public API used by the template after it injects data
+function initializeCharts(data) {
+  try {
+    createSentimentChart(data.sentiment || {});
+    createHateChart(data.hate || {});
+    createTimelineChart(data.timeline || {});
+  } catch (e) {
+    console.error('Chart initialization failed', e);
+  } finally {
+    // show footer always after chart init
+    showFooter();
+    // restore button
+    const b = document.querySelector('#youtube-analysis-form button[type="submit"]');
+    if (b && b.dataset && b.dataset.originalText) {
+      b.innerHTML = b.dataset.originalText;
+      b.disabled = false;
+    }
+    // hide loader
+    const loader = document.getElementById('loading-animation');
+    if (loader) loader.style.display = 'none';
+  }
+}
+
+// ====== Chart builders ======
+function createSentimentChart(dist) {
+  const ctx = document.getElementById('sentimentChart');
+  if (!ctx) return;
+  if (sentimentChart) sentimentChart.destroy();
+
+  const labels = Object.keys(dist);
+  const values = Object.values(dist);
+
+  // ensure labels order: Positive, Neutral, Negative
+  const order = ['Positive', 'Neutral', 'Negative'];
+  const orderedValues = order.map(k => dist[k] || 0);
+  const orderedLabels = order;
+
+  sentimentChart = new Chart(ctx, {
+    type: 'pie',
+    data: {
+      labels: orderedLabels,
+      datasets: [{
+        data: orderedValues,
+        backgroundColor: ['#2ecc71', '#95a5a6', '#e74c3c'], // green, grey, red
+        borderColor: '#000',
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: { color: getCSSVariable('--text-secondary') || '#fff' }
+        },
+        tooltip: { mode: 'index', intersect: false }
+      }
+    }
+  });
+}
+
+function createHateChart(dist) {
+  const ctx = document.getElementById('hateChart');
+  if (!ctx) return;
+  if (hateChart) hateChart.destroy();
+
+  // order Safe Content then Hate Speech
+  const labels = ['Safe Content', 'Hate Speech'];
+  const values = [dist['Safe Content'] || 0, dist['Hate Speech'] || 0];
+
+  hateChart = new Chart(ctx, {
+    type: 'pie',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        backgroundColor: ['#2ecc71', '#e74c3c'],
+        borderColor: '#000',
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: { color: getCSSVariable('--text-secondary') || '#fff' }
+        },
+        tooltip: { mode: 'index', intersect: false }
+      }
+    }
+  });
+}
+
+function createTimelineChart(timeline) {
+  const ctx = document.getElementById('timelineChart');
+  if (!ctx) return;
+  if (timelineChart) timelineChart.destroy();
+
+  if (!timeline || !timeline.labels || !timeline.datasets) return;
+
+  timelineChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: timeline.labels,
+      datasets: [
+        { label: 'Positive', data: timeline.datasets.positive || [], backgroundColor: '#2ecc71' },
+        { label: 'Neutral', data: timeline.datasets.neutral || [], backgroundColor: '#95a5a6' },
+        { label: 'Negative', data: timeline.datasets.negative || [], backgroundColor: '#e74c3c' }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', labels: { color: getCSSVariable('--text-secondary') || '#fff' } },
+        tooltip: { mode: 'index', intersect: false }
+      },
+      scales: {
+        y: { beginAtZero: true, stacked: true, ticks: { color: getCSSVariable('--text-secondary') } },
+        x: { stacked: true, ticks: { color: getCSSVariable('--text-secondary') } }
+      }
+    }
+  });
+}
+
+// Export to template
+window.initializeCharts = initializeCharts;

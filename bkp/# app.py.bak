@@ -1,0 +1,433 @@
+# app.py (full replacement) - replace your current app.py with this file
+
+from dotenv import load_dotenv
+load_dotenv()
+
+import os
+import re
+import json
+import nltk
+nltk.download('stopwords', quiet=True)
+
+from flask import Flask, render_template, request, current_app
+from markupsafe import Markup
+
+from model.predict import predict
+from utils.cleaning import count_offensive_words, OFFENSIVE_WORDS
+import plotly.graph_objects as go
+import plotly.io as pio
+from datetime import datetime
+
+from helpers.youtube_fetch import (
+    get_comments_by_video,
+    get_comments_by_channel,
+    extract_video_id,
+    extract_channel_id
+)
+from helpers.analysis import (
+    analyze_comments_sentiment_hate,
+    prepare_timeline_data,
+    generate_insights,
+    calculate_kpis
+)
+
+# Initialize Flask app (keep your template folder config)
+template_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'static', 'templates')
+app = Flask(__name__, static_folder='static', template_folder=template_dir)
+
+
+# -----------------------
+# Simple pages (unchanged)
+# -----------------------
+@app.route('/', methods=['GET'])
+def home():
+    return render_template('home.html')
+
+
+@app.route('/input', methods=['GET', 'POST'])
+@app.route('/analyser/input', methods=['GET', 'POST'])
+def input_page():
+    # Keep original input page behavior (unchanged from your version)
+    sentiment = ""
+    hate_speech = ""
+    input_text = ""
+    sentiment_score = {"Positive": 0, "Neutral": 0, "Negative": 0}
+    hate_score = {"Hate Speech": 0, "None": 0}
+    offensive_word_count = 0
+    vulgarity = "--"
+    pie_chart_div = None
+    bar_chart_div = None
+    line_chart_div = None
+    highlighted_input = None
+    sentiment_emoji = ""
+    offensive_found = []
+
+    if request.method == 'POST':
+        import pandas as pd
+
+        if 'csv_file' in request.files and request.files['csv_file'].filename != '':
+            csv_file = request.files['csv_file']
+            try:
+                df = pd.read_csv(csv_file)
+                text_column = None
+                possible_columns = ['text', 'tweet', 'content', 'message', 'caption']
+                for col in df.columns:
+                    if any(possible_col in col.lower() for possible_col in possible_columns):
+                        text_column = col
+                        break
+                if text_column is None and len(df.columns) > 0:
+                    text_column = df.columns[0]
+                if text_column and len(df) > 0:
+                    rows_to_analyze = min(5, len(df))
+                    texts = df[text_column].head(rows_to_analyze).fillna('').tolist()
+                    input_text = '\n'.join(texts)
+                else:
+                    input_text = "Could not find text data in the CSV file."
+            except Exception as e:
+                input_text = f"Error processing CSV file: {str(e)}"
+        else:
+            input_text = request.form.get('user_input', '')
+
+        OFFENSIVE_WORDS_LIST = OFFENSIVE_WORDS or set()
+        words = [w.strip('.,!?;:').lower() for w in input_text.split()]
+        offensive_found = [w for w in words if w in OFFENSIVE_WORDS_LIST]
+        offensive_word_count = len(offensive_found)
+        total_words = len([w for w in words if w.isalpha()])
+        if total_words == 0:
+            total_words = 1
+        vulgarity_percentage = round((offensive_word_count / total_words) * 100, 2)
+        if offensive_word_count == 0:
+            vulgarity_label = "Clean"
+        elif vulgarity_percentage < 10:
+            vulgarity_label = "Low"
+        elif vulgarity_percentage < 30:
+            vulgarity_label = "Medium"
+        else:
+            vulgarity_label = "High"
+        vulgarity = f"{vulgarity_label} ({vulgarity_percentage}%)"
+
+        import re as _re
+        def highlight_offensive_words(text):
+            def replacer(match):
+                word = match.group(0).lower()
+                if word in OFFENSIVE_WORDS_LIST:
+                    return f'<span style="color: red; font-weight: bold;">{match.group(0)}</span>'
+                return match.group(0)
+            pattern = _re.compile(r'\b\w+\b', _re.IGNORECASE)
+            return pattern.sub(replacer, text)
+        highlighted_input = highlight_offensive_words(input_text)
+
+        sentiment_result = predict(input_text, mode='sentiment')
+        hate_result = predict(input_text, mode='hate')
+        sentiment = str(sentiment_result)
+        hate_speech = str(hate_result)
+
+        sentiment_score = {"Positive": 0, "Neutral": 0, "Negative": 0}
+        hate_score = {"Hate Speech": 0, "None": 100}
+        if sentiment.lower().startswith("positive"):
+            sentiment_emoji = "😊"
+            sentiment_score["Positive"] = 100
+        elif sentiment.lower().startswith("neutral"):
+            sentiment_emoji = "😐"
+            sentiment_score["Neutral"] = 100
+        elif sentiment.lower().startswith("negative"):
+            sentiment_emoji = "😠"
+            sentiment_score["Negative"] = 100
+
+        if hate_speech.lower().startswith("hate speech") or hate_speech.lower().startswith("hate"):
+            hate_score["Hate Speech"] = 100
+            hate_score["None"] = 0
+
+        # charts code (same as before)
+        labels = ['Positive', 'Neutral', 'Negative']
+        values = [sentiment_score['Positive'], sentiment_score['Neutral'], sentiment_score['Negative']]
+        fig_bar_sentiment = go.Figure(data=[go.Bar(x=labels, y=values, text=[f'{v:.0f}%' for v in values], textposition='auto', hoverinfo='y+text')])
+        fig_bar_sentiment.update_layout(margin=dict(t=20, b=20, l=20, r=20), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, font=dict(family='Inter, sans-serif', color='white'), xaxis=dict(title='', tickfont=dict(size=14, color='#ffffff')), yaxis=dict(title='Score', tickfont=dict(size=12, color='#ffffff'), range=[0, 100]))
+        sentiment_chart = pio.to_html(fig_bar_sentiment, full_html=False)
+
+        from collections import Counter
+        offensive_freq = Counter([w for w in words if w in OFFENSIVE_WORDS_LIST])
+        if not offensive_freq:
+            bar_labels = ['No offensive words found']
+            bar_values = [0]
+        else:
+            bar_labels = list(offensive_freq.keys())
+            bar_values = list(offensive_freq.values())
+        fig_bar = go.Figure(data=[go.Bar(x=bar_labels, y=bar_values, textposition='auto', textfont=dict(color='white'), hoverinfo='x+y')])
+        fig_bar.update_layout(margin=dict(t=10, b=0, l=0, r=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=250, font=dict(family='Inter, sans-serif', color='white'))
+        bar_chart_div = pio.to_html(fig_bar, full_html=False)
+
+        return render_template(
+            'input.html',
+            sentiment=sentiment,
+            hate_speech=hate_speech,
+            user_input=input_text,
+            sentiment_score=sentiment_score,
+            hate_score=hate_score,
+            offensive_word_count=offensive_word_count,
+            vulgarity=vulgarity,
+            sentiment_chart=sentiment_chart,
+            bar_chart_div=bar_chart_div,
+            line_chart_div=line_chart_div,
+            highlighted_input=highlighted_input,
+            sentiment_emoji=sentiment_emoji,
+            offensive_words_found=offensive_found
+        )
+
+    return render_template(
+        'input.html',
+        sentiment=sentiment,
+        hate_speech=hate_speech,
+        user_input=input_text,
+        sentiment_score=sentiment_score,
+        hate_score=hate_score,
+        offensive_word_count=offensive_word_count,
+        vulgarity=vulgarity,
+        sentiment_chart=None,
+        bar_chart_div=bar_chart_div,
+        line_chart_div=line_chart_div,
+        highlighted_input=highlighted_input,
+        sentiment_emoji=sentiment_emoji,
+        offensive_words_found=[]
+    )
+
+
+@app.route('/about', methods=['GET'])
+def about():
+    return render_template('about.html')
+
+
+@app.route('/blog', methods=['GET'])
+def blog():
+    return render_template('blog.html')
+
+
+@app.route('/contact', methods=['GET'])
+def contact():
+    return render_template('contact.html')
+
+
+@app.route('/dashboard', methods=['GET'])
+def dashboard():
+    return render_template('dashboard.html')
+
+
+@app.route('/export', methods=['GET'])
+def export():
+    return render_template('export.html')
+
+
+# -----------------------
+# Robust YouTube analysis route
+# -----------------------
+@app.route('/youtube-analysis', methods=['GET', 'POST'])
+def youtube_analysis():
+    # helper to convert any Jinja Undefined or odd objects to safe python types
+    def _make_json_safe(o):
+        if o is None:
+            return None
+        if isinstance(o, (str, int, float, bool)):
+            return o
+        try:
+            from markupsafe import Markup as _Markup
+            if isinstance(o, _Markup):
+                return str(o)
+        except Exception:
+            pass
+        try:
+            if getattr(o, "__class__", None) and o.__class__.__name__ == "Undefined":
+                return None
+        except Exception:
+            pass
+        if isinstance(o, dict):
+            return {k: _make_json_safe(v) for k, v in o.items()}
+        if isinstance(o, (list, tuple, set)):
+            return [_make_json_safe(v) for v in o]
+        if hasattr(o, "__dict__"):
+            try:
+                return _make_json_safe(vars(o))
+            except Exception:
+                pass
+        try:
+            return str(o)
+        except Exception:
+            return None
+
+    # -------------------------
+    # Escape/normalize strings to avoid embedding-breaking content
+    # (escape closing </script> and convert raw newlines to escaped sequences)
+    # -------------------------
+    def _escape_script_tags_in_obj(o):
+        if o is None:
+            return None
+        # primitives
+        if isinstance(o, (int, float, bool)):
+            return o
+        if isinstance(o, str):
+            # Prevent breaking the <script type="application/json"> block in templates.
+            return o.replace('</script>', '<\\/script>').replace('\r', '\\r').replace('\n', '\\n')
+        if isinstance(o, dict):
+            return {k: _escape_script_tags_in_obj(v) for k, v in o.items()}
+        if isinstance(o, list):
+            return [_escape_script_tags_in_obj(v) for v in o]
+        if isinstance(o, tuple):
+            return tuple(_escape_script_tags_in_obj(v) for v in o)
+        # fallback: try to stringify safely
+        try:
+            return str(o)
+        except Exception:
+            return None
+
+    if request.method == 'POST':
+        try:
+            youtube_input = request.form.get('youtube_url', '').strip()
+            past_days = min(max(1, int(request.form.get('past_days', 7))), 30)
+
+            if not youtube_input:
+                return render_template('youtube_analysis.html', results={'error': 'Please enter a YouTube video URL or channel ID'})
+
+            video_id = extract_video_id(youtube_input)
+            channel_id = None
+            if not video_id:
+                channel_id = extract_channel_id(youtube_input)
+                if not channel_id and re.match(r"^UC[A-Za-z0-9_\-]{20,}$", youtube_input):
+                    channel_id = youtube_input
+
+            if not video_id and not channel_id:
+                return render_template('youtube_analysis.html', results={'error': 'Invalid YouTube URL or ID. Please provide a valid video URL or channel ID.'})
+
+            # fetch comments from helper
+            if video_id:
+                comments_data = get_comments_by_video(video_id, past_days)
+            else:
+                comments_data = get_comments_by_channel(channel_id, past_days)
+
+            if isinstance(comments_data, dict) and 'error' in comments_data:
+                return render_template('youtube_analysis.html', results={'error': f"Could not retrieve comments: {comments_data['error']}"})
+            if not isinstance(comments_data, list):
+                return render_template('youtube_analysis.html', results={'error': 'Unexpected response fetching comments.'})
+            if len(comments_data) == 0:
+                return render_template('youtube_analysis.html', results={'error': 'No comments returned from YouTube for given input.'})
+
+            # run prediction per comment
+            normalized_comments = []
+            for raw in comments_data:
+                text = (raw.get('text') or '').strip()
+                if not text:
+                    continue
+
+                try:
+                    sent_raw = predict(text, mode='sentiment')
+                except Exception:
+                    sent_raw = None
+                try:
+                    hate_raw = predict(text, mode='hate')
+                except Exception:
+                    hate_raw = None
+
+                def map_sent(s):
+                    if not s:
+                        return "Neutral"
+                    sv = str(s).strip().lower()
+                    if sv.startswith('pos') or 'positive' in sv:
+                        return "Positive"
+                    if sv.startswith('neg') or 'negative' in sv:
+                        return "Negative"
+                    return "Neutral"
+
+                def map_hate(h):
+                    if not h:
+                        return "Safe Content"
+                    hv = str(h).strip().lower()
+                    if hv.startswith('hate') or 'hate' in hv or hv in ('offensive','abusive'):
+                        return "Hate Speech"
+                    return "Safe Content"
+
+                sent = map_sent(sent_raw)
+                hate = map_hate(hate_raw)
+
+                normalized_comments.append({
+                    'text': text,
+                    'username': raw.get('username') or raw.get('author') or 'Unknown',
+                    'date': raw.get('date') or raw.get('publishedAt') or '',
+                    'likes': int(raw.get('likes') or raw.get('likeCount') or 0),
+                    'sentiment': sent,
+                    'hate_speech': hate
+                })
+
+            if not normalized_comments:
+                return render_template('youtube_analysis.html', results={'error': 'No valid comment text found (all empty).'})
+
+            # analyze, aggregate
+            analyzed_comments = analyze_comments_sentiment_hate(normalized_comments)
+            kpis = calculate_kpis(analyzed_comments)
+            timeline_data = prepare_timeline_data(analyzed_comments, past_days)
+            insights = generate_insights(analyzed_comments, past_days)
+
+            # debug
+            print("[DEBUG] sentiment counts:", {s: sum(1 for c in analyzed_comments if c['sentiment'] == s) for s in ('Positive','Neutral','Negative')})
+
+            # prepare distributions expected by template & JS
+            sentiment_distribution = {
+                'Positive': sum(1 for c in analyzed_comments if c['sentiment'] == 'Positive'),
+                'Neutral':  sum(1 for c in analyzed_comments if c['sentiment'] == 'Neutral'),
+                'Negative': sum(1 for c in analyzed_comments if c['sentiment'] == 'Negative'),
+            }
+            hate_distribution = {
+                'Safe Content': sum(1 for c in analyzed_comments if c['hate_speech'] == 'Safe Content'),
+                'Hate Speech':  sum(1 for c in analyzed_comments if c['hate_speech'] == 'Hate Speech'),
+            }
+
+            # Build results dict with JSON-safe simple types and also convenience top-level KPIs that template expects
+            results = {
+                'kpis': kpis,
+                'total_comments': len(analyzed_comments),
+                'analyzed_comments': analyzed_comments,
+                'timeline_data': timeline_data,
+                'insights': insights,
+                'error': None,
+                # convenience top-level fields used in your template
+                'hate_percentage': kpis.get('hate_speech_pct', 0.0),
+                'positive_percentage': kpis.get('positive_pct', 0.0),
+                'negative_percentage': kpis.get('negative_pct', 0.0),
+                'neutral_percentage': kpis.get('neutral_pct', 0.0),
+                # distributions consumed by JS (names match youtube_analysis.html expected keys)
+                'sentiment_distribution': sentiment_distribution,
+                'hate_distribution': hate_distribution,
+                # charts HTML (we're not relying on these in template's Chart.js; they are optional)
+                'charts': {
+                    'pie_sent': str(pio.to_html(go.Figure(), full_html=False)),
+                }
+            }
+
+            # Markup HTML versions for direct insertion if needed by template
+            charts_html = {
+                'pie_sent': Markup(str(pio.to_html(go.Figure(), full_html=False))),
+            }
+
+            # Ensure there is no Jinja Undefined left
+            safe_results = _make_json_safe(results)
+
+            # SANITIZE strings so embedding inside <script type="application/json"> won't break
+            safe_results = _escape_script_tags_in_obj(safe_results)
+
+            # return to template (charts_html is Markup for any direct insertion)
+            return render_template('youtube_analysis.html', results=safe_results, charts=charts_html)
+
+        except Exception as e:
+            import traceback
+            error_message = f"Error during YouTube analysis: {str(e)}"
+            print(error_message)
+            print(traceback.format_exc())
+            return render_template('youtube_analysis.html', results={'error': error_message})
+
+    # GET
+    return render_template('youtube_analysis.html', results=None)
+
+# -----------------------
+# Run server
+# -----------------------
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    debug = os.environ.get('FLASK_ENV') == 'development'
+    app.run(host='0.0.0.0', port=port, debug=debug)

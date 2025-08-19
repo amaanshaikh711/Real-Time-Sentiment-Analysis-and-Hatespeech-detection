@@ -1,0 +1,192 @@
+// youtube_analysis.js — final fixed
+
+let sentimentChart = null;
+let hateChart = null;
+let timelineChart = null;
+
+function getCSSVariable(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+// Loader + form handling
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('youtube-analysis-form');
+  const loader = document.getElementById('loading-animation');
+  const button = form ? form.querySelector('button[type="submit"]') : null;
+
+  if (form && loader) {
+    form.addEventListener('submit', () => {
+      loader.style.display = 'flex';
+      if (button) {
+        button.disabled = true;
+        button.setAttribute('data-original-text', button.innerHTML);
+        button.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Analyzing...`;
+      }
+    });
+  }
+
+  // Init charts if data exists
+  const el = document.getElementById('analysis-data');
+  if (el) {
+    try {
+      const analysisData = JSON.parse(el.textContent);
+      initializeCharts(analysisData);
+    } catch (e) {
+      console.error('Failed to parse analysis data', e);
+    }
+  }
+
+  // Show more comments button
+  const showMoreBtn = document.getElementById('show-more-comments');
+  if (showMoreBtn) {
+    showMoreBtn.addEventListener('click', () => {
+      const hidden = document.querySelectorAll('.hidden-comment');
+      const batch = Array.from(hidden).slice(0, 10);
+      batch.forEach(el => (el.style.display = 'block', el.classList.remove('hidden-comment')));
+      if (document.querySelectorAll('.hidden-comment').length === 0) {
+        showMoreBtn.style.display = 'none';
+      }
+    });
+  }
+});
+
+// Public API
+function initializeCharts(data) {
+  try {
+    createSentimentChart(data.sentiment || {});
+    createHateChart(data.hate || {});
+    createTimelineChart(data.timeline || {});
+  } catch (e) {
+    console.error('Chart initialization failed', e);
+  }
+}
+
+// ====== Chart builders ======
+
+function createSentimentChart(dist) {
+  const ctx = document.getElementById('sentimentChart');
+  if (!ctx) return;
+
+  if (sentimentChart) sentimentChart.destroy();
+
+  const labels = Object.keys(dist);
+  const values = Object.values(dist);
+
+  sentimentChart = new Chart(ctx, {
+    type: 'pie',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        backgroundColor: ['#2ecc71', '#95a5a6', '#e74c3c'], // Green, Grey, Red
+        borderColor: '#000',
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: { color: getCSSVariable('--text-secondary') }
+        },
+        tooltip: { mode: 'index', intersect: false }
+      }
+    }
+  });
+}
+
+function createHateChart(dist) {
+  const ctx = document.getElementById('hateChart');
+  if (!ctx) return;
+
+  if (hateChart) hateChart.destroy();
+
+  const labels = Object.keys(dist);
+  const values = Object.values(dist);
+
+  hateChart = new Chart(ctx, {
+    type: 'pie',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        backgroundColor: ['#2ecc71', '#e74c3c'], // Green, Red
+        borderColor: '#000',
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: { color: getCSSVariable('--text-secondary') }
+        },
+        tooltip: { mode: 'index', intersect: false }
+      }
+    }
+  });
+}
+
+function createTimelineChart(timeline) {
+  const ctx = document.getElementById('timelineChart');
+  if (!ctx) return;
+
+  if (timelineChart) timelineChart.destroy();
+
+  if (!timeline || !timeline.labels || !timeline.datasets) return;
+
+  timelineChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: timeline.labels,
+      datasets: [
+        {
+          label: 'Positive',
+          data: timeline.datasets.positive || [],
+          backgroundColor: '#2ecc71'
+        },
+        {
+          label: 'Neutral',
+          data: timeline.datasets.neutral || [],
+          backgroundColor: '#95a5a6'
+        },
+        {
+          label: 'Negative',
+          data: timeline.datasets.negative || [],
+          backgroundColor: '#e74c3c'
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: { color: getCSSVariable('--text-secondary') }
+        },
+        tooltip: { mode: 'index', intersect: false }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          stacked: true,
+          ticks: { color: getCSSVariable('--text-secondary') },
+          grid: { color: getCSSVariable('--border-color') }
+        },
+        x: {
+          stacked: true,
+          ticks: { color: getCSSVariable('--text-secondary') },
+          grid: { color: getCSSVariable('--border-color') }
+        }
+      }
+    }
+  });
+}
+
+// Export to template
+window.initializeCharts = initializeCharts;

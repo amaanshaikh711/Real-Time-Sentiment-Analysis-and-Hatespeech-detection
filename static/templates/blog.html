@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Blog - HateSense AI</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Inter', sans-serif;
+      background-color: #121212;
+      color: #fff;
+    }
+
+    .main-content {
+      padding: 30px 20px;
+      margin-left: 240px; /* Prevent content from going under sidebar */
+      transition: margin-left 0.3s ease;
+    }
+
+    .blog-section {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 30px;
+      background: rgba(30, 30, 30, 0.95);
+      border-radius: 15px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.4);
+    }
+
+    .blog-section h2 {
+      text-align: center;
+      margin-bottom: 30px;
+      font-size: 2rem;
+      color: #fff;
+    }
+
+    .blog-post {
+      background: #1e1e1e;
+      padding: 20px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      box-shadow: 0 0 6px rgba(255, 255, 255, 0.04);
+      transition: 0.3s ease;
+    }
+
+    .blog-post:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 0 15px rgba(138, 43, 226, 0.4);
+    }
+
+    .blog-post h3 {
+      margin-bottom: 10px;
+      color: #ffffff;
+    }
+
+    .blog-post p {
+      color: #ccc;
+      font-size: 0.95rem;
+      margin-bottom: 10px;
+    }
+
+    .read-more {
+      color: #8a2be2;
+      text-decoration: underline;
+      font-weight: 600;
+    }
+
+    @media screen and (max-width: 768px) {
+      .main-content {
+        margin-left: 0;
+      }
+    }
+  </style>
+</head>
+<body class="dark-mode">
+  <!-- <header class="header">
+    <button id="sidebar-toggle" class="sidebar-toggle" aria-label="Toggle Sidebar">&#9776;</button>
+    <h1 class="logo centered-logo">HateSense AI</h1>
+    <button id="mode-toggle" class="mode-toggle" aria-label="Toggle Dark Mode">🌙</button>
+  </header>
+
+  <aside id="sidebar" class="sidebar active" aria-label="Sidebar Navigation">
+    <ul class="sidebar-list">
+      <li><a href="{{ url_for('home') }}" class="sidebar-link">Home</a></li>
+      <li><a href="{{ url_for('input_page') }}" class="sidebar-link">Analyzer</a></li>
+      <li><a href="{{ url_for('dashboard') }}" class="sidebar-link">Dashboard</a></li>
+      <li><a href="{{ url_for('about') }}" class="sidebar-link">About</a></li>
+      <li><a href="{{ url_for('blog') }}" class="sidebar-link active">Blog</a></li>
+      <li><a href="#" class="sidebar-link">Export</a></li>
+      <li><a href="#" class="sidebar-link">Settings</a></li>
+    </ul>
+  </aside> -->
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HateSense AI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+<header class="bg-purple-900 text-white body-font shadow-md">
+  <div class="container mx-auto flex flex-wrap p-5 flex-row items-center justify-between">
+    <!-- Logo + Title -->
+    <a href="home.html" class="flex items-center">
+      <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ6u2GaWZHiyXqheenkO4ISJSxodgY_wN_a6A&s" alt="HateSense AI Logo" class="w-10 h-10 rounded-full bg-white p-1">
+      <span class="ml-3 text-xl font-bold">HateSense AI</span>
+    </a>
+
+    <!-- Navigation Links -->
+    <nav class="flex space-x-6 text-base">
+      <a href="home.html" class="hover:text-gray-300">Home</a>
+      <a href="input.html" class="hover:text-gray-300">Analyser</a>
+      <a href="about.html" class="hover:text-gray-300">About</a>
+      <a href="contact.html" class="hover:text-gray-300">Contact</a>
+    </nav>
+  </div>
+</header>
+
+
+  <main class="main-content" role="main">
+    <section class="blog-section glass-card">
+      <h2>Latest Insights & Articles</h2>
+
+      <article class="blog-post">
+        <h3>Understanding Online Hate Speech: Challenges and Solutions</h3>
+        <p>Online hate speech is a growing concern worldwide. This article explores the complexities of detecting hate speech and how AI technologies like HateSense AI are making a difference.</p>
+        <a href="#" class="read-more">Read More</a>
+      </article>
+
+      <article class="blog-post">
+        <h3>The Role of AI in Promoting Safer Social Media</h3>
+        <p>Artificial intelligence is transforming how social media platforms manage harmful content. Learn about the latest advancements and ethical considerations.</p>
+        <a href="#" class="read-more">Read More</a>
+      </article>
+
+      <article class="blog-post">
+        <h3>Protecting User Privacy in AI-Powered Moderation</h3>
+        <p>Balancing effective content moderation with user privacy is critical. Discover how HateSense AI ensures confidentiality while maintaining accuracy.</p>
+        <a href="#" class="read-more">Read More</a>
+      </article>
+
+      <article class="blog-post">
+        <h3>Real-Time Hate Detection at Scale</h3>
+        <p>Learn how HateSense AI uses distributed systems and NLP to analyze millions of posts per day, detecting hate speech in real-time with minimal latency.</p>
+        <a href="#" class="read-more">Read More</a>
+      </article>
+
+      <article class="blog-post">
+        <h3>Ethics of AI in Content Moderation</h3>
+        <p>Should machines have the power to decide what's hateful? Dive into ethical concerns around bias, transparency, and fairness in automated moderation.</p>
+        <a href="#" class="read-more">Read More</a>
+      </article>
+    </section>
+  </main>
+
+ <!-- footer sections -->
+
+<footer class="footer">
+  <div class="footer-container">
+    <div>
+      <h3>Our Mission</h3>
+      <p>
+        We aim to use artificial intelligence to detect and reduce hate speech and vulgar content on social media. By analyzing sentiment and offensive language, our project helps create a safer and more respectful online space.
+        <br><br>
+        Our technology uses machine learning to identify patterns in toxic language, empowering platforms and users to filter negativity. Together, we fight digital hate one post at a time!
+      </p>
+    </div>
+    <div>
+      <h3>Our Vision</h3>
+      <p>
+        To build a future where digital conversations are inclusive, clean, and free of hostility. Our vision is a world where AI is used not only for convenience, but also for compassion and community wellbeing.
+        <br><br>
+        We envision widespread use of our tools in schools, offices, and public platforms, where content quality matters. Let’s make the internet a better place.
+      </p>
+    </div>
+    <div>
+      <h3>Quick Links</h3>
+      <ul>
+        <li><a href="index.html">🏠 Home</a></li>
+        <li><a href="about.html">📘 About</a></li>
+        <li><a href="services.html">🛠️ Services</a></li>
+        <li><a href="contact.html">📞 Contact</a></li>
+      </ul>
+      <div class="social-icons">
+        <a href="#"><i class="fab fa-facebook-f"></i></a>
+        <a href="#"><i class="fab fa-twitter"></i></a>
+        <a href="#"><i class="fab fa-instagram"></i></a>
+        <a href="#"><i class="fab fa-linkedin-in"></i></a>
+      </div>
+    </div>
+  </div>
+ 
+  <!-- footer sections -->
+
+<footer class="footer">
+  <div class="footer-container">
+    <div>
+      <h3>Our Mission</h3>
+      <p>
+        We aim to use artificial intelligence to detect and reduce hate speech and vulgar content on social media. By analyzing sentiment and offensive language, our project helps create a safer and more respectful online space.
+        <br><br>
+        Our technology uses machine learning to identify patterns in toxic language, empowering platforms and users to filter negativity. Together, we fight digital hate one post at a time!
+      </p>
+    </div>
+    <div>
+      <h3>Our Vision</h3>
+      <p>
+        To build a future where digital conversations are inclusive, clean, and free of hostility. Our vision is a world where AI is used not only for convenience, but also for compassion and community wellbeing.
+        <br><br>
+        We envision widespread use of our tools in schools, offices, and public platforms, where content quality matters. Let’s make the internet a better place.
+      </p>
+    </div>
+    <div>
+      <h3>Quick Links</h3>
+      <ul>
+        <li><a href="index.html">🏠 Home</a></li>
+        <li><a href="about.html">📘 About</a></li>
+        <li><a href="services.html">🛠️ Services</a></li>
+        <li><a href="contact.html">📞 Contact</a></li>
+      </ul>
+      <div class="social-icons">
+        <a href="#"><i class="fab fa-facebook-f"></i></a>
+        <a href="#"><i class="fab fa-twitter"></i></a>
+        <a href="#"><i class="fab fa-instagram"></i></a>
+        <a href="#"><i class="fab fa-linkedin-in"></i></a>
+      </div>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    &copy; 2025 Amaan Shaikh. All rights reserved.
+  </div>
+</footer>
+
+  <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>

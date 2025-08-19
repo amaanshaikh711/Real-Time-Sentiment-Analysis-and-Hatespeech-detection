@@ -1,0 +1,373 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<!-- START: YouTube analysis page specific CSS (paste near top of youtube_analysis.html) -->
+<style>
+    /* Force footer static on this page so it won't overlay results while loader runs */
+    footer, .site-footer {
+      position: static !important;
+      z-index: 1 !important;
+    }
+    
+    /* Results above footer */
+    .youtube-analysis-container {
+      position: relative;
+      z-index: 2;
+    }
+    
+    /* Chart area sizing so Chart.js has space */
+    .chart-container { min-height: 260px; }
+    .chart-container canvas { min-height: 260px !important; height: 300px !important; width:100% !important; display:block; }
+</style>
+    
+<!-- END: YouTube analysis page specific CSS -->
+
+<!-- container -->
+<div class="youtube-analysis-container">
+    <!-- Header Section -->
+    <div class="youtube-header">
+        <h1 class="gradient-text">🎥 YouTube Analysis</h1>
+        <p class="header-description">Analyze YouTube comments for hate speech and sentiment patterns using advanced AI detection</p>
+    </div>
+
+    <!-- Analysis Form -->
+    <div class="analysis-form-container">
+        <form id="youtube-analysis-form" method="POST" class="youtube-form">
+            <div class="form-inputs-row">
+                <div class="input-group-3d">
+                    <label for="youtube_url" class="input-label">
+                        <i class="fab fa-youtube"></i> YouTube Channel ID or Video URL
+                    </label>
+                    <input 
+                        type="text" 
+                        id="youtube_url" 
+                        name="youtube_url" 
+                        class="glassmorphism-input-3d" 
+                        placeholder="Enter YouTube video URL or channel ID..."
+                        required
+                        value="{{ request.form.get('youtube_url', '') }}"
+                    />
+                </div>
+
+                <div class="input-group-3d">
+                    <label for="past_days" class="input-label">
+                        <i class="fas fa-calendar-alt"></i> Past Days to Analyze
+                    </label>
+                    <input 
+                        type="number" 
+                        id="past_days" 
+                        name="past_days" 
+                        class="glassmorphism-input-3d" 
+                        placeholder="7"
+                        min="1" 
+                        max="30" 
+                        value="{{ request.form.get('past_days', '7') }}"
+                        required
+                    />
+                </div>
+            </div>
+
+            <div class="form-button-container">
+                <button type="submit" class="analyze-btn-grad-3d">
+                    <i class="fas fa-search"></i> Start Analysis
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Loading Animation -->
+    <div id="loading-animation" class="loading-container" style="display: none;">
+        <div class="loading-spinner"></div>
+        <p class="loading-text">Analyzing YouTube comments...</p>
+    </div>
+
+    <!-- Results Section -->
+    {% if results is not none %}
+    <div class="results-container">
+        <!-- Error Display -->
+        {% if results.error %}
+        <div class="error-message">
+            <i class="fas fa-exclamation-triangle"></i>
+            <span>{{ results.error }}</span>
+        </div>
+        {% else %}
+        
+        <!-- KPIs Section -->
+        <div class="kpi-section">
+            <div class="kpi-card">
+                <div class="kpi-icon">📊</div>
+                <div class="kpi-content">
+                    <h3>{{ results.total_comments }}</h3>
+                    <p>Total Comments</p>
+                </div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-icon">⚠️</div>
+                <div class="kpi-content">
+                    <h3>{{ results.kpis.hate_speech_pct }}%</h3>
+                    <p>Hate Speech</p>
+                </div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-icon">😊</div>
+                <div class="kpi-content">
+                    <h3>{{ results.kpis.positive_pct }}%</h3>
+                    <p>Positive Sentiment</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="charts-section">
+            <div class="chart-container">
+                <h3 class="chart-title">Sentiment Distribution</h3>
+                <canvas id="sentimentChart"></canvas>
+            </div>
+            
+            <div class="chart-container">
+                <h3 class="chart-title">Hate Speech Detection</h3>
+                <canvas id="hateChart"></canvas>
+            </div>
+            
+            <div class="chart-container chart-full-width">
+                <h3 class="chart-title">Comment Activity Timeline</h3>
+                <canvas id="timelineChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Insights Section -->
+        <div class="insights-section">
+            <h3 class="section-title">📈 Analysis Insights</h3>
+            <div class="insights-grid">
+                {% for insight in results.insights %}
+                <div class="insight-card">
+                    <p>{{ insight }}</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Recent Comments Section -->
+        {% set initial_count = 6 %}
+        <div class="comments-section">
+            <h3 class="section-title">💬 Recent Comments ({{ results.total_comments }})</h3>
+            <div class="comments-container">
+                {% for comment in results.analyzed_comments %}
+                {% if comment and comment.get('username') %}
+                <div class="comment-card {% if comment.get('hate_speech') == 'Hate Speech' %}hate-comment{% endif %} {% if loop.index0 >= initial_count %}hidden-comment{% endif %}">
+                    <div class="comment-header">
+                        <div class="comment-user">
+                            <i class="fas fa-user-circle"></i>
+                            <span class="username">{{ comment.get('username', 'Anonymous') }}</span>
+                        </div>
+                        <div class="comment-meta">
+                            <span class="comment-date">{{ comment.get('date', 'No date')[:10] }}</span>
+                            {% if comment.get('likes', 0) > 0 %}
+                            <span class="comment-likes">
+                                <i class="fas fa-thumbs-up"></i> {{ comment.get('likes') }}
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="comment-text">{{ comment.get('text', 'No text available.') }}</div>
+                    <div class="comment-analysis">
+                        <span class="sentiment-badge sentiment-{{ comment.get('sentiment', 'neutral').lower() }}">
+                            {{ comment.get('sentiment', 'Neutral') }}
+                        </span>
+                        <span class="hate-badge {% if comment.get('hate_speech') == 'Hate Speech' %}hate-detected{% else %}safe-content{% endif %}">
+                            {{ comment.get('hate_speech', 'Safe Content') }}
+                        </span>
+                    </div>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+            {% if results.analyzed_comments|length > initial_count %}
+            <div class="show-more-container" style="text-align: center; margin-top: 1rem;">
+                <button id="show-more-comments" class="analyze-btn-grad-3d" type="button">
+                    <i class="fas fa-chevron-down"></i> Show more comments
+                </button>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<!-- Chart.js Scripts -->
+<!-- Always load Chart.js + our page JS -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{ url_for('static', filename='js/youtube_analysis.js') }}"></script>
+
+{% if results and not results.error %}
+  <!-- Only embed chart data when results exist -->
+  <!-- Use pre-serialized JSON produced server-side (results_json) to avoid Jinja Undefined serialization issues -->
+  <script id="analysis-data" type="application/json">
+  {{ results_json | safe }}
+  </script>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const el = document.getElementById('analysis-data');
+      if (!el) return;
+      try {
+        const serverData = JSON.parse(el.textContent || '{}');
+
+        // Determine sentiment counts (fallback if server doesn't include separate distributions)
+        let sentimentCounts = { Positive: 0, Neutral: 0, Negative: 0 };
+        let hateCounts = { "Safe Content": 0, "Hate Speech": 0 };
+        let timeline = { labels: [], datasets: { positive: [], neutral: [], negative: [] } };
+
+        // If server provided pre-computed KPI counts inside kpis/timeline_data, use them
+        if (serverData.timeline_data && typeof serverData.timeline_data === 'object') {
+          timeline = serverData.timeline_data;
+        }
+
+        // Build counts from analyzed_comments if present
+        if (Array.isArray(serverData.analyzed_comments)) {
+          serverData.analyzed_comments.forEach(c => {
+            try {
+              const s = (c.sentiment || c.sentiment === 0) ? c.sentiment : c['sentiment'];
+              const h = (c.hate_speech || c.hate_speech === 0) ? c.hate_speech : c['hate_speech'];
+
+              const sNorm = (typeof s === 'string') ? s : String(s);
+              if (sNorm.toLowerCase().startsWith('pos') || sNorm.toLowerCase().indexOf('positive') !== -1) sentimentCounts.Positive++;
+              else if (sNorm.toLowerCase().startsWith('neg') || sNorm.toLowerCase().indexOf('negative') !== -1) sentimentCounts.Negative++;
+              else sentimentCounts.Neutral++;
+
+              const hNorm = (typeof h === 'string') ? h : String(h);
+              if (hNorm.toLowerCase().startsWith('hate')) hateCounts['Hate Speech']++;
+              else hateCounts['Safe Content']++;
+            } catch (e) {
+              // ignore malformed comment
+            }
+          });
+        }
+
+        // If timeline missing or empty, create a defensive one from analyzed_comments dates
+        if ((!timeline || !Array.isArray(timeline.labels) || timeline.labels.length === 0) && Array.isArray(serverData.analyzed_comments)) {
+          // aggregate by date
+          const byDate = {};
+          serverData.analyzed_comments.forEach(c => {
+            const dRaw = (c.date || '').toString().split('T')[0] || new Date().toISOString().split('T')[0];
+            if (!byDate[dRaw]) byDate[dRaw] = { Positive: 0, Neutral: 0, Negative: 0 };
+            const s = (c.sentiment || 'Neutral').toString();
+            if (s.toLowerCase().startsWith('pos') || s.toLowerCase().indexOf('positive') !== -1) byDate[dRaw].Positive++;
+            else if (s.toLowerCase().startsWith('neg') || s.toLowerCase().indexOf('negative') !== -1) byDate[dRaw].Negative++;
+            else byDate[dRaw].Neutral++;
+          });
+          const labels = Object.keys(byDate).sort();
+          timeline.labels = labels;
+          timeline.datasets = {
+            positive: labels.map(l => byDate[l].Positive),
+            negative: labels.map(l => byDate[l].Negative),
+            neutral:  labels.map(l => byDate[l].Neutral)
+          };
+        }
+
+        // Prepare data for Chart.js charts
+        const sentimentLabels = ['Positive', 'Neutral', 'Negative'];
+        const sentimentValues = [sentimentCounts.Positive, sentimentCounts.Neutral, sentimentCounts.Negative];
+        const sentimentColors = ['#2ecc71', '#95a5a6', '#e74c3c']; // green, grey, red
+
+        const hateLabels = ['Safe Content', 'Hate Speech'];
+        const hateValues = [hateCounts['Safe Content'], hateCounts['Hate Speech']];
+        const hateColors = ['#2ecc71', '#e74c3c'];
+
+        // Timeline arrays (ensure arrays exist)
+        const tl_labels = (timeline.labels || []).slice();
+        const tl_pos = ((timeline.datasets || {}).positive || []).slice();
+        const tl_neu = ((timeline.datasets || {}).neutral || []).slice();
+        const tl_neg = ((timeline.datasets || {}).negative || []).slice();
+
+        // Create Sentiment Pie (doughnut)
+        const ctxSent = document.getElementById('sentimentChart').getContext('2d');
+        if (window.sentimentChart) window.sentimentChart.destroy();
+        window.sentimentChart = new Chart(ctxSent, {
+          type: 'doughnut',
+          data: {
+            labels: sentimentLabels,
+            datasets: [{
+              label: 'Sentiment',
+              data: sentimentValues,
+              backgroundColor: sentimentColors,
+              borderColor: ['#000000','#000000','#000000'],
+              borderWidth: 0.5
+            }]
+          },
+          options: {
+            plugins: {
+              legend: { position: 'bottom', labels: { color: 'white' } }
+            },
+            maintainAspectRatio: false,
+            responsive: true
+          }
+        });
+
+        // Hate pie
+        const ctxHate = document.getElementById('hateChart').getContext('2d');
+        if (window.hateChart) window.hateChart.destroy();
+        window.hateChart = new Chart(ctxHate, {
+          type: 'doughnut',
+          data: {
+            labels: hateLabels,
+            datasets: [{
+              label: 'Hate',
+              data: hateValues,
+              backgroundColor: hateColors,
+              borderColor: ['#000','#000'],
+              borderWidth: 0.5
+            }]
+          },
+          options: {
+            plugins: {
+              legend: { position: 'bottom', labels: { color: 'white' } }
+            },
+            maintainAspectRatio: false,
+            responsive: true
+          }
+        });
+
+        // Timeline stacked bar
+        const ctxTl = document.getElementById('timelineChart').getContext('2d');
+        if (window.timelineChart) window.timelineChart.destroy();
+        window.timelineChart = new Chart(ctxTl, {
+          type: 'bar',
+          data: {
+            labels: tl_labels,
+            datasets: [
+              { label: 'Positive', data: tl_pos, backgroundColor: '#2ecc71' },
+              { label: 'Negative', data: tl_neg, backgroundColor: '#e74c3c' },
+              { label: 'Neutral',  data: tl_neu, backgroundColor: '#95a5a6' }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { labels: { color: 'white' } }
+            },
+            scales: {
+              x: { stacked: true, ticks: { color: 'white' } },
+              y: { stacked: true, beginAtZero: true, ticks: { color: 'white' } }
+            }
+          }
+        });
+
+      } catch (e) {
+        console.error('Failed to parse analysis data', e);
+      }
+    });
+
+    // Show more comments button behaviour (same as before)
+    document.addEventListener('click', function (ev) {
+      if (ev.target && ev.target.id === 'show-more-comments') {
+        document.querySelectorAll('.hidden-comment').forEach(el => el.classList.remove('hidden-comment'));
+        ev.target.style.display = 'none';
+      }
+    });
+  </script>
+{% endif %}
+{% endblock %}

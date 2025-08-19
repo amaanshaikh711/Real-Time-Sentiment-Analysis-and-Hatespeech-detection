@@ -1,0 +1,630 @@
+<!-- VERSION 3.1 CHECK -->
+{% extends 'base.html' %}
+
+{% block content %}
+<!-- Font & Icons -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+  :root{
+    --bg:#0f0f24;
+    --panel:#1b1628;
+    --accent1:#8a2be2;   /* purple */
+    --accent2:#d07aff;   /* lighter */
+    --muted:#bfb6cc;
+    --glass: rgba(255,255,255,0.03);
+  }
+  
+  .wrap{max-width:1200px;margin:28px auto;padding:22px;box-sizing:border-box;}
+  .topbar{
+    display:flex;gap:16px;align-items:center;justify-content:space-between;margin-bottom:18px;
+  }
+  .brand{
+    display:flex;align-items:center;gap:12px;
+  }
+  .brand img{width:44px;height:44px;border-radius:8px;background:#fff;padding:3px;}
+  .brand h1{font-size:20px;margin:0;font-weight:800;color:var(--accent2);}
+  .subtitle{color:var(--muted);font-size:14px}
+
+  /* Input card */
+  .input-card{
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    border-radius:12px;padding:18px;border:1px solid rgba(138,43,226,0.08);
+    box-shadow: 0 6px 30px rgba(138,43,226,0.05);
+    display:flex;gap:12px;align-items:center;
+  }
+  .input-card textarea{
+    resize:none;flex:1;background:transparent;border:none;color:inherit;
+    min-height:84px;padding:12px;font-size:15px;border-radius:8px;
+    color: #fff;
+    font-family: inherit;
+  }
+  .input-card textarea::placeholder {
+    color: var(--muted);
+  }
+  .input-card textarea:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(138,43,226,0.3);
+  }
+  .controls{display:flex;flex-direction:column;gap:8px}
+  .btn{
+    background: linear-gradient(90deg,var(--accent1),var(--accent2));
+    color:#fff;padding:10px 16px;border-radius:10px;border:none;font-weight:700;cursor:pointer;
+    box-shadow: 0 8px 30px rgba(138,43,226,0.18);
+    transition: all 0.3s ease;
+  }
+  .btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 40px rgba(138,43,226,0.25);
+  }
+  .btn.secondary{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted);box-shadow:none;padding:8px 12px}
+  .btn.secondary:hover{background:rgba(138,43,226,0.1);color:#fff;}
+
+  /* KPI cards */
+  .kpi-row{display:flex;gap:18px;margin-top:18px;flex-wrap:wrap}
+  .kpi{
+    background:var(--panel);border-radius:12px;padding:18px;min-width:160px;flex:1;
+    display:flex;flex-direction:column;gap:6px;border:1px solid rgba(255,255,255,0.02);
+    transition: all 0.3s ease;
+  }
+  .kpi:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(138,43,226,0.15);
+  }
+  .kpi .label{color:var(--muted);font-size:13px;font-weight:600}
+  .kpi .value{font-size:28px;font-weight:800}
+  .kpi .pct{color:var(--accent2);font-weight:700}
+  
+  /* main grid */
+  .main-grid{display:grid;grid-template-columns: 1fr 420px;gap:18px;margin-top:18px}
+  
+  /* charts & details */
+  .panel{
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    border-radius:12px;padding:18px;border:1px solid rgba(138,43,226,0.06);
+    margin-bottom: 18px;
+  }
+  .panel h3{margin:0 0 10px 0;font-size:16px;color:var(--accent2)}
+  .chart-wrap{display:flex;gap:12px;align-items:center;flex-direction:column}
+  canvas{max-width:100%;height:260px!important}
+
+  /* detected phrases table */
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{padding:10px;border-bottom:1px dashed rgba(255,255,255,0.03);text-align:left}
+  th{color:var(--muted);font-weight:600;font-size:13px}
+  .severity{display:inline-block;padding:6px 10px;border-radius:999px;font-weight:700;font-size:12px}
+  .sev-high{background:rgba(231,76,60,0.12);color:#ff6b6b;border:1px solid rgba(231,76,60,0.12)}
+  .sev-med{background:rgba(255,193,7,0.08);color:#ffd54a}
+  .sev-low{background:rgba(76,175,80,0.06);color:#6ee7a7}
+
+  /* table container */
+  .list-panel{max-height:320px;overflow:auto;margin-top:12px;border-radius:8px;padding-right:6px}
+
+  /* small utilities */
+  .muted{color:var(--muted);font-size:13px}
+  .actions{display:flex;gap:8px;align-items:center}
+  .chip{background:var(--glass);padding:6px 10px;border-radius:999px;color:var(--muted);font-weight:700}
+
+  /* nice hover for useful links (3d button-like) */
+  .action-btn{
+    padding:8px 12px;border-radius:10px;background:transparent;border:1px solid rgba(255,255,255,0.04);
+    color:var(--accent2);font-weight:700;cursor:pointer;box-shadow:0 6px 18px rgba(138,43,226,0.06);
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+  .action-btn:hover{ transform: translateY(-4px) ; box-shadow: 0 14px 40px rgba(138,43,226,0.18); }
+
+  /* highlight found words */
+  .hit { background: rgba(138,43,226,0.14); padding:2px 6px; border-radius:6px; color:var(--accent2); font-weight:700; }
+
+  /* footer small note */
+  .foot-note{margin-top:12px;color:var(--muted);font-size:13px}
+
+  /* Loading animation */
+  .loading {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid rgba(138,43,226,0.3);
+    border-radius: 50%;
+    border-top-color: #8a2be2;
+    animation: spin 1s ease-in-out infinite;
+  }
+  
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  /* Responsive styles */
+  @media (max-width:1000px){ 
+    .main-grid{grid-template-columns:1fr} 
+    .right-col{order:2} 
+  }
+  
+  @media (max-width:768px){
+    .wrap{padding:12px;margin:12px auto}
+    .topbar{flex-direction:column;align-items:flex-start}
+    .brand{margin-bottom:12px}
+    .kpi-row{gap:10px}
+    .kpi{padding:12px;min-width:auto}
+    .input-card{flex-direction:column;align-items:stretch}
+    .controls{flex-direction:row;justify-content:space-between}
+    textarea{min-height:120px}
+    .panel h3{font-size:14px}
+  }
+  
+  @media (max-width:480px){
+    .kpi-row{flex-direction:column}
+    .kpi{margin-bottom:8px}
+    .main-grid{display:flex;flex-direction:column}
+    .chart-wrap{height:auto}
+    canvas{height:200px!important}
+    .panel{padding:12px}
+    th, td{padding:8px 6px;font-size:12px}
+    .severity{padding:4px 6px;font-size:10px}
+  }
+</style>
+
+<div class="wrap">
+  <div class="topbar">
+    <div class="brand">
+      <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ6u2GaWZHiyXqheenkO4ISJSxodgY_wN_a6A&s" alt="logo">
+      <div>
+        <h1>HateSense AI</h1>
+        <div class="subtitle">Realtime hate-speech & sentiment analysis</div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:12px;align-items:center">
+      <div class="chip">Model: v1.2</div>
+      <button class="action-btn" id="exportBtn"><i class="fa fa-download" style="margin-right:8px"></i>Export CSV</button>
+    </div>
+  </div>
+
+  <!-- Input Card -->
+  <div class="input-card">
+    <form method="POST" action="{{ url_for('input_page') }}" id="analyzeForm" enctype="multipart/form-data" style="display:flex;width:100%;gap:12px;align-items:center">
+      <textarea name="user_input" id="userInput" placeholder="Paste tweet text or thread here — then click Analyze. Example: 'I don't like this product, it's trash'" required>{{ user_input or '' }}</textarea>
+      <div class="controls">
+        <button type="submit" class="btn" id="analyzeBtn">
+          <span id="analyzeText">Analyze</span>
+          <span id="analyzeLoading" class="loading" style="display:none;"></span>
+        </button>
+        <button type="button" id="clearBtn" class="btn secondary">Clear</button>
+        <label for="csvUpload" class="btn secondary" style="margin-top:8px;display:flex;align-items:center;justify-content:center;gap:6px">
+          <i class="fa fa-file-csv"></i> Upload CSV
+        </label>
+        <input type="file" id="csvUpload" name="csv_file" accept=".csv" style="display:none">
+      </div>
+    </form>
+  </div>
+
+  <div class="muted" style="text-align:right;margin-top:6px">Privacy: Text processed locally in demo mode</div>
+
+  <!-- KPI Cards - Always visible with initial state -->
+  <div class="kpi-row">
+    <div class="kpi">
+      <div class="label">Hate Speech Detected</div>
+      <div class="value" style="color:#ff6b6b" id="hateSpeechValue">0</div>
+      <div class="muted">Examples flagged: <span id="hateSpeechCount">0</span></div>
+    </div>
+    <div class="kpi">
+      <div class="label">Offensive Terms</div>
+      <div class="value" style="color:#ffd54a" id="offensiveValue">0</div>
+      <div class="muted">Confidence avg: <span id="offensiveConfidence">0</span>%</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Neutral</div>
+      <div class="value" id="neutralValue">0</div>
+      <div class="muted">Share: <span id="neutralShare">0</span>%</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Positive</div>
+      <div class="value" style="color:#6ee7a7" id="positiveValue">0</div>
+      <div class="muted">Share: <span id="positiveShare">0</span>%</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Negative</div>
+      <div class="value" style="color:#ff6b6b" id="negativeValue">0</div>
+      <div class="muted">Share: <span id="negativeShare">0</span>%</div>
+    </div>
+  </div>
+
+  <!-- Main Grid Layout -->  
+  <div class="main-grid">
+    <!-- Left Column: Charts -->  
+    <div>
+      <div class="panel">
+        <h3>Sentiment Breakdown</h3>
+        <div class="chart-wrap">
+          <canvas id="pieChart" width="400" height="260"></canvas>
+        </div>
+      </div>
+      
+      <div class="panel">
+        <h3>Analysis Results</h3>
+        <div class="chart-wrap">
+          <canvas id="barChart" width="400" height="260"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column: Details -->
+    <div class="right-col">
+      <div class="panel">
+        <h3>Quick Insights</h3>
+        <div id="insights">
+          <p class="muted">Analyze text to see insights...</p>
+        </div>
+        <div class="actions" style="margin-top:12px">
+          <button class="action-btn" id="copyBtn"><i class="fa fa-copy"></i> Copy Summary</button>
+          <button class="action-btn" id="reportBtn"><i class="fa fa-flag"></i> Generate Report</button>
+          <button class="action-btn" id="vizBtn"><i class="fa fa-chart-bar"></i> Open Full Viz</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Safety Recommendation</h3>
+        <div id="recommendations">
+          <p class="muted">No analysis performed yet...</p>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Detected Phrases & Evidence</h3>
+        <div class="list-panel">
+          <table id="phrasesTable">
+            <thead>
+              <tr>
+                <th>Phrase</th>
+                <th>Severity</th>
+                <th>Context</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="phrasesBody">
+              <tr>
+                <td colspan="4" style="text-align:center;color:var(--muted)">No phrases detected yet...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Initialize charts
+let pieChart, barChart;
+
+// Sample analysis data (replace with real model predictions)
+function analyzeText(text) {
+  // Simulate analysis delay
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      const words = text.toLowerCase().split(' ');
+      const hateWords = ['hate', 'stupid', 'idiot', 'dumb', 'terrible', 'awful', 'horrible'];
+      const offensiveWords = ['bad', 'worst', 'terrible', 'awful', 'hate'];
+      
+      let hateCount = 0;
+      let offensiveCount = 0;
+      
+      words.forEach(word => {
+        if (hateWords.includes(word)) hateCount++;
+        if (offensiveWords.includes(word)) offensiveCount++;
+      });
+      
+      // Calculate sentiment (simplified)
+      let sentiment = 'neutral';
+      if (hateCount > 0) sentiment = 'negative';
+      else if (text.includes('good') || text.includes('great') || text.includes('love')) sentiment = 'positive';
+      
+      const results = {
+        hateSpeech: hateCount,
+        offensive: offensiveCount,
+        sentiment: {
+          neutral: sentiment === 'neutral' ? 60 : 20,
+          positive: sentiment === 'positive' ? 60 : 10,
+          negative: sentiment === 'negative' ? 60 : 10
+        },
+        phrases: []
+      };
+      
+      // Add detected phrases
+      if (hateCount > 0) {
+        results.phrases.push({
+          phrase: words.find(w => hateWords.includes(w)) || 'hate',
+          severity: 'HIGH',
+          context: text.substring(0, 50) + '...'
+        });
+      }
+      
+      resolve(results);
+    }, 1500);
+  });
+}
+
+// Update UI with analysis results
+function updateUI(results) {
+  // Update KPI cards
+  document.getElementById('hateSpeechValue').textContent = results.hateSpeech;
+  document.getElementById('hateSpeechCount').textContent = results.hateSpeech;
+  document.getElementById('offensiveValue').textContent = results.offensive;
+  document.getElementById('offensiveConfidence').textContent = Math.round((results.offensive / results.hateSpeech) * 100) || 0;
+  document.getElementById('neutralValue').textContent = results.sentiment.neutral;
+  document.getElementById('neutralShare').textContent = results.sentiment.neutral;
+  document.getElementById('positiveValue').textContent = results.sentiment.positive;
+  document.getElementById('positiveShare').textContent = results.sentiment.positive;
+  document.getElementById('negativeValue').textContent = results.sentiment.negative;
+  document.getElementById('negativeShare').textContent = results.sentiment.negative;
+  
+  // Update charts
+  updateCharts(results);
+  
+  // Update insights
+  updateInsights(results);
+  
+  // Update recommendations
+  updateRecommendations(results);
+  
+  // Update phrases table
+  updatePhrasesTable(results.phrases);
+}
+
+// Update charts
+function updateCharts(results) {
+  // Pie Chart
+  const pieCtx = document.getElementById('pieChart').getContext('2d');
+  if (pieChart) pieChart.destroy();
+  
+  pieChart = new Chart(pieCtx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Neutral', 'Positive', 'Negative'],
+      datasets: [{
+        data: [results.sentiment.neutral, results.sentiment.positive, results.sentiment.negative],
+        backgroundColor: ['#6ee7a7', '#8a2be2', '#ff6b6b'],
+        borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: {
+            color: '#bfb6cc',
+            font: {
+              size: 14,
+              weight: 'bold'
+            }
+          }
+        }
+      }
+    }
+  });
+  
+  // Bar Chart
+  const barCtx = document.getElementById('barChart').getContext('2d');
+  if (barChart) barChart.destroy();
+  
+  barChart = new Chart(barCtx, {
+    type: 'bar',
+    data: {
+      labels: ['Hate Speech', 'Offensive', 'Neutral', 'Positive'],
+      datasets: [{
+        label: 'Count',
+        data: [results.hateSpeech, results.offensive, results.sentiment.neutral, results.sentiment.positive],
+        backgroundColor: ['#ff6b6b', '#ffd54a', '#6ee7a7', '#8a2be2'],
+        borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: false
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          grid: {
+            color: 'rgba(255,255,255,0.1)'
+          },
+          ticks: {
+            color: '#bfb6cc'
+          }
+        },
+        x: {
+          grid: {
+            color: 'rgba(255,255,255,0.1)'
+          },
+          ticks: {
+            color: '#bfb6cc',
+            font: {
+              weight: 'bold'
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+// Update insights
+function updateInsights(results) {
+  const insights = document.getElementById('insights');
+  let topCategory = 'Neutral';
+  if (results.hateSpeech > 0) topCategory = 'Hate Speech';
+  else if (results.sentiment.positive > results.sentiment.neutral) topCategory = 'Positive';
+  
+  insights.innerHTML = `
+    <p><strong>Top Category:</strong> <span style="color: #8a2be2; font-weight: bold;">${topCategory}</span></p>
+    <p><strong>Avg Toxicity:</strong> <span style="color: #ff6b6b; font-weight: bold;">${Math.round((results.hateSpeech / (results.hateSpeech + results.offensive)) * 100)}%</span></p>
+  `;
+}
+
+// Update recommendations
+function updateRecommendations(results) {
+  const recommendations = document.getElementById('recommendations');
+  let recommendationsHTML = '';
+  
+  if (results.hateSpeech > 0) {
+    recommendationsHTML = `
+      <ul style="color: #ff6b6b;">
+        <li>Immediate content removal recommended</li>
+        <li>Issue warning to user</li>
+        <li>Monitor for similar content</li>
+      </ul>
+    `;
+  } else if (results.offensive > 0) {
+    recommendationsHTML = `
+      <ul style="color: #ffd54a;">
+        <li>Consider content review</li>
+        <li>Monitor for escalation</li>
+        <li>No immediate action required</li>
+      </ul>
+    `;
+  } else {
+    recommendationsHTML = `
+      <ul style="color: #6ee7a7;">
+        <li>No immediate removal</li>
+        <li>No warnings necessary</li>
+        <li>Keep monitoring for patterns</li>
+      </ul>
+    `;
+  }
+  
+  recommendations.innerHTML = recommendationsHTML;
+}
+
+// Update phrases table
+function updatePhrasesTable(phrases) {
+  const tbody = document.getElementById('phrasesBody');
+  
+  if (phrases.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted)">No harmful phrases detected</td></tr>';
+    return;
+  }
+  
+  tbody.innerHTML = phrases.map(phrase => `
+    <tr>
+      <td><span class="hit">${phrase.phrase}</span></td>
+      <td><span class="severity sev-${phrase.severity.toLowerCase()}">${phrase.severity}</span></td>
+      <td>${phrase.context}</td>
+      <td class="actions">
+        <button class="action-btn" onclick="copyText('${phrase.phrase}')"><i class="fa fa-copy"></i></button>
+        <button class="action-btn" onclick="flagPhrase('${phrase.phrase}')"><i class="fa fa-flag"></i></button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+// Event listeners
+document.addEventListener('DOMContentLoaded', function() {
+  const analyzeForm = document.getElementById('analyzeForm');
+  const clearBtn = document.getElementById('clearBtn');
+  const csvUpload = document.getElementById('csvUpload');
+  const exportBtn = document.getElementById('exportBtn');
+  
+  // Analyze form submission
+  analyzeForm.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const text = document.getElementById('userInput').value.trim();
+    if (!text) {
+      alert('Please enter some text to analyze');
+      return;
+    }
+    
+    // Show loading state
+    document.getElementById('analyzeText').style.display = 'none';
+    document.getElementById('analyzeLoading').style.display = 'inline-block';
+    document.getElementById('analyzeBtn').disabled = true;
+    
+    try {
+      const results = await analyzeText(text);
+      updateUI(results);
+    } catch (error) {
+      console.error('Analysis failed:', error);
+      alert('Analysis failed. Please try again.');
+    } finally {
+      // Hide loading state
+      document.getElementById('analyzeText').style.display = 'inline';
+      document.getElementById('analyzeLoading').style.display = 'none';
+      document.getElementById('analyzeBtn').disabled = false;
+    }
+  });
+  
+  // Clear button
+  clearBtn.addEventListener('click', function() {
+    document.getElementById('userInput').value = '';
+    // Reset to initial state
+    updateUI({
+      hateSpeech: 0,
+      offensive: 0,
+      sentiment: { neutral: 0, positive: 0, negative: 0 },
+      phrases: []
+    });
+  });
+  
+  // CSV upload
+  csvUpload.addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const csv = e.target.result;
+        // Process CSV data (simplified)
+        const lines = csv.split('\n');
+        const text = lines.slice(1).join(' '); // Skip header
+        document.getElementById('userInput').value = text;
+        alert(`Loaded ${lines.length - 1} entries from CSV`);
+      };
+      reader.readAsText(file);
+    }
+  });
+  
+  // Export button
+  exportBtn.addEventListener('click', function() {
+    const data = {
+      timestamp: new Date().toISOString(),
+      analysis: 'Sample export data'
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'hatesense-analysis.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+  
+  // Initialize with empty state
+  updateUI({
+    hateSpeech: 0,
+    offensive: 0,
+    sentiment: { neutral: 0, positive: 0, negative: 0 },
+    phrases: []
+  });
+});
+
+// Utility functions
+function copyText(text) {
+  navigator.clipboard.writeText(text).then(() => {
+    alert('Copied to clipboard!');
+  });
+}
+
+function flagPhrase(phrase) {
+  alert(`Flagged phrase: ${phrase}`);
+}
+</script>
+{% endblock %}

@@ -1,0 +1,204 @@
+/* ============ HOME PAGE ENHANCED LAYOUT ============ */
+
+/* Center, enlarge Lottie animation in the hero */
+.home-content.glass-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 500px;
+  padding-top: 4px;
+  padding-bottom: 44px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.home-content .home-icon {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 32px;
+  width: 100%;
+}
+.home-content .home-icon dotlottie-wc {
+  max-width: 90vw;
+  max-height: 50vh;
+}
+
+/* Large heading */
+.home-content h2 {
+  font-size: 3.5rem;
+  font-weight: 900;
+  letter-spacing: -2px;
+  color: #e0caff;
+  margin-bottom: 25px;
+  margin-top: 0;
+  line-height: 1.1;
+  text-shadow: 0 4px 40px #aa7ff1, 0 2px 10px #5b1fa2;
+}
+
+/* Paragraph */
+.home-content p {
+  font-size: 1rem;
+  color: #d1c4e9;
+  max-width: 800px;
+  margin-left: auto;
+  margin-right: auto;
+  margin-bottom: 20px;
+  letter-spacing: 1px;
+}
+
+/* Button glow hover */
+.btn.btn-glow {
+  background: linear-gradient(90deg, #7b2ff7, #f107a3);
+  color: white;
+  padding: 12px 28px;
+  border-radius: 8px;
+  font-weight: bold;
+  text-decoration: none;
+  transition: all 0.3s ease;
+}
+.btn.btn-glow:hover {
+  box-shadow: 0 0 20px rgba(123, 47, 247, 0.7), 0 0 40px rgba(241, 7, 163, 0.6);
+  transform: translateY(-2px);
+}
+
+/* ============ FLASHCARDS SECTION ============ */
+.flashcards-section {
+  margin-top: 40px;
+}
+.flashcards-section .section-title {
+  font-size: 2.2rem;
+  font-weight: 900;
+  margin-bottom: 18px;
+  margin-top: 24px;
+  color: #f1eaff;
+  letter-spacing: -1px;
+  text-align: center;
+}
+.flashcards-section .flashcards-container {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  align-items: stretch;
+  gap: 28px;
+  margin-top: 20px;
+}
+
+.flashcard {
+  border-radius: 16px;
+  padding: 32px 16px 20px 16px;
+  background: rgba(41, 7, 89, 0.25);
+  box-shadow: 0 0 28px rgba(138, 43, 226, 0.2);
+  transition: all 0.3s ease;
+}
+.flashcard:hover {
+  box-shadow: 0 0 28px rgba(138, 43, 226, 0.5), 0 0 40px rgba(241, 7, 163, 0.4);
+  transform: translateY(-4px);
+}
+
+.flashcards-section .flashcard h3 {
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: #f3e7ff;
+  margin-bottom: 13px;
+  letter-spacing: -0.6px;
+}
+.flashcards-section .flashcard p {
+  font-size: 1.02rem;
+  font-weight: 500;
+  color: #bfaad9;
+  margin-bottom: 0;
+  margin-top: 8px;
+}
+
+/* Second row flashcards */
+.flashcards-section:nth-of-type(2) .flashcards-container {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  gap: 22px;
+}
+.flashcards-section:nth-of-type(2) .flashcard {
+  min-width: 180px;
+  max-width: 200px;
+  flex: 1 0 180px;
+  height: 110px;
+  padding: 28px 8px 16px 8px;
+  background: rgba(44, 10, 70, 0.24);
+  border-radius: 16px;
+  box-shadow: 0 0 17px rgba(138, 43, 226, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.flashcards-section:nth-of-type(2) .flashcard p {
+  font-size: 1.3rem;
+  font-weight: 900;
+  color: #e8d4ff;
+  margin: 0;
+  letter-spacing: 1px;
+}
+
+/* ============ SERVICES SECTION ============ */
+.services-section {
+  margin-top: 50px;
+}
+.services-heading {
+  text-align: center;
+  font-size: 2rem;
+  font-weight: 900;
+  color: #f1eaff;
+  margin-bottom: 24px;
+}
+.services-section {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 32px;
+}
+.services-section .glass-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  height: 100%;
+  min-height: 280px;
+  padding: 20px;
+  background: rgba(41, 7, 89, 0.25);
+  border-radius: 16px;
+  transition: all 0.3s ease;
+}
+.services-section .glass-card:hover {
+  box-shadow: 0 0 28px rgba(138, 43, 226, 0.5), 0 0 40px rgba(241, 7, 163, 0.4);
+  transform: translateY(-4px);
+}
+.services-section .glass-card h2 {
+  font-size: 1.6rem;
+  font-weight: 900;
+  margin-bottom: 14px;
+  color: #f3e7ff;
+}
+.services-section .glass-card p,
+.services-section .glass-card ul,
+.services-section .glass-card ol,
+.services-section .glass-card blockquote {
+  font-size: 1.03rem;
+  color: #cfbee8;
+  line-height: 1.6;
+}
+
+/* ============ RESPONSIVE ============ */
+@media (max-width: 900px) {
+  .flashcards-section .flashcards-container,
+  .flashcards-section:nth-of-type(2) .flashcards-container {
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 20px !important;
+  }
+  .flashcard {
+    width: 90vw !important;
+    height: auto !important;
+  }
+  .services-section {
+    grid-template-columns: 1fr !important;
+  }
+}
