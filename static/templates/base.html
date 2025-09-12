@@ -77,6 +77,19 @@
       transition: max-height 0.4s ease, opacity 0.4s ease;
       overflow: hidden;
     }
+
+    /* Auth page styles - remove sidebar spacing */
+    .auth-page .main-column {
+      margin-left: 0 !important;
+    }
+    .auth-page #main-content {
+      margin-left: 0 !important;
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+    }
+    .auth-page .layout {
+      padding-left: 0 !important;
+    }
   </style>
 </head>
 <body>
@@ -94,10 +107,18 @@
     <div class="nav-links">
       <a href="{{ url_for('home') }}" class="nav-link">🏠 Home</a>
       <a href="{{ url_for('input_page') }}" class="nav-link">🔍 Analyzer</a>
+      <a href="{{ url_for('youtube_analysis') }}" class="nav-link">▶️ YouTube</a>
       <a href="{{ url_for('about') }}" class="nav-link">📘 About</a>
       <a href="{{ url_for('contact') }}" class="nav-link">📞 Contact</a>
-      <a href="{{ url_for('dashboard') }}" class="nav-link">📊 Dashboard</a>
       <a href="{{ url_for('blog') }}" class="nav-link">📰 Blog</a>
+
+      <!-- Show Login or Logout / Profile depending on auth state -->
+      {% if current_user %}
+        <a href="{{ url_for('profile') }}" class="nav-link">👤 Profile</a>
+        <a href="{{ url_for('logout') }}" class="nav-link">🔓 Logout</a>
+      {% else %}
+        <a href="{{ url_for('login') }}" class="nav-link">🔒 Login</a>
+      {% endif %}
     </div>
   </div>
 
@@ -105,16 +126,20 @@
   {% include 'navbar.html' %}
 
   <!-- Main layout: sidebar and main column as siblings in a flex row -->
-  <div id="layoutWrapper" class="layout flex h-screen">
-    <!-- Sidebar (hidden on mobile) -->
-    {% include 'sidebar.html' %}
+  <div id="layoutWrapper" class="layout flex h-screen {% if hide_sidebar|default(false) %}auth-page{% endif %}">
+    <!-- Sidebar (hidden on mobile and auth pages) -->
+    {% if not hide_sidebar|default(false) %}
+      {% include 'sidebar.html' %}
+    {% endif %}
 
     <!-- Main Column: content + footer -->
     <div class="main-column flex flex-col flex-1 min-h-0">
-      <main id="main-content" class="flex-1 p-2 transition-all duration-300 ml-56 overflow-y-auto">
+      <main id="main-content" class="flex-1 p-2 transition-all duration-300 {% if not hide_sidebar|default(false) %}ml-56{% endif %} overflow-y-auto">
         {% block content %}{% endblock %}
       </main>
-      {% include 'footer.html' %}
+      {% if not hide_sidebar|default(false) %}
+        {% include 'footer.html' %}
+      {% endif %}
     </div>
   </div>
 

@@ -1,4 +1,4 @@
-# app.py (full replacement) - replace your current app.py with this file
+# app.py (enhanced with Supabase authentication) - Full replacement
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -7,16 +7,28 @@ import os
 import re
 import json
 import nltk
+from functools import wraps
+from datetime import datetime, timedelta
+import hashlib
+import secrets
+import warnings
+
+# Suppress scikit-learn version warnings
+warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", category=FutureWarning)
+
 nltk.download('stopwords', quiet=True)
 
-from flask import Flask, render_template, request, current_app
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, g
 from markupsafe import Markup
+import supabase
+from supabase import create_client, Client
+from flask_cors import CORS, cross_origin
 
 from model.predict import predict
 from utils.cleaning import count_offensive_words, OFFENSIVE_WORDS
 import plotly.graph_objects as go
 import plotly.io as pio
-from datetime import datetime
 
 from helpers.youtube_fetch import (
     get_comments_by_video,
@@ -31,23 +43,459 @@ from helpers.analysis import (
     calculate_kpis
 )
 
-# Initialize Flask app (keep your template folder config)
+# Initialize Flask app
 template_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'static', 'templates')
 app = Flask(__name__, static_folder='static', template_folder=template_dir)
 
+# Configuration
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-change-this')
+app.config['SESSION_TYPE'] = 'filesystem'
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
+app.config['USE_SUPABASE'] = True  # Use app config instead of global
+
+# Ensure cookies are sent in common dev setups (adjust for production)
+app.config['SESSION_COOKIE_SECURE'] = False
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+
+# Supabase configuration
+from config import SUPABASE_URL, SUPABASE_KEY, SUPABASE_SERVICE_KEY
+
+# Use service key for admin operations, anon key for client operations
+SUPABASE_ANON_KEY = SUPABASE_KEY or SUPABASE_SERVICE_KEY
+
+# Fallback user storage for testing when Supabase is unavailable
+fallback_users = {}
+
+# Initialize USE_SUPABASE from app config
+USE_SUPABASE = app.config['USE_SUPABASE']
+
+try:
+    supabase_client: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+    print(f"[INFO] Connected to Supabase: {SUPABASE_URL}")
+except Exception as e:
+    print(f"[WARNING] Failed to connect to Supabase: {e}")
+    print("[INFO] Using fallback authentication system for testing")
+    supabase_client = None
+    app.config['USE_SUPABASE'] = False
+    USE_SUPABASE = False
+
+# Enable CORS globally
+CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
+
+def network_safe(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        try:
+            return f(*args, **kwargs)
+        except requests.exceptions.RequestException:
+            app.logger.exception("Supabase network error")
+            return jsonify({"error": "Network connection error. Please check your internet connection and try again."}), 503
+        except Exception:
+            app.logger.exception("Internal error in auth route")
+            return jsonify({"error": "Internal server error"}), 500
+    return decorated
 
 # -----------------------
-# Simple pages (unchanged)
+# Authentication Decorators
 # -----------------------
-@app.route('/', methods=['GET'])
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            flash('Please log in to access this page.', 'warning')
+            return redirect(url_for('login', next=request.url))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            flash('Please log in to access this page.', 'warning')
+            return redirect(url_for('login'))
+        
+        # Check if user is admin
+        user_role = session.get('user_role', 'user')
+        if user_role != 'admin':
+            flash('Admin access required.', 'danger')
+            # dashboard removed — redirect to home
+            return redirect(url_for('home'))
+        
+        return f(*args, **kwargs)
+    return decorated_function
+
+# -----------------------
+# Context Processors
+# -----------------------
+@app.before_request
+def load_user():
+    from flask import current_app
+    current_use_supabase = current_app.config.get('USE_SUPABASE', True)
+    
+    if 'user_id' in session:
+        user_id = session['user_id']
+        user_email = session.get('user_email')
+
+        if current_use_supabase and supabase_client:
+            try:
+                user_response = supabase_client.auth.get_user()
+                if user_response.user:
+                    g.user = {
+                        'id': user_response.user.id,
+                        'email': user_response.user.email,
+                        'user_metadata': user_response.user.user_metadata or {}
+                    }
+                else:
+                    session.clear()
+                    g.user = None
+            except Exception:
+                session.clear()
+                g.user = None
+        else:
+            # Use fallback user data
+            if user_email and user_email in fallback_users:
+                user_data = fallback_users[user_email]
+                g.user = {
+                    'id': user_data['id'],
+                    'email': user_data['email'],
+                    'username': user_data['username'],
+                    'user_metadata': {'username': user_data['username']}
+                }
+            else:
+                session.clear()
+                g.user = None
+    else:
+        g.user = None
+
+@app.context_processor
+def inject_user():
+    return dict(current_user=g.user)
+
+# -----------------------
+# Add small helper to set session in one place (moved here so login can call it)
+def _set_session_user(user_id, email, username=None):
+    # set unified session keys and make session persistent
+    session.clear()
+    session['user_id'] = user_id
+    session['user_email'] = email
+    if username:
+        session['user_username'] = username
+    session.permanent = True
+
+# -----------------------
+# Authentication Routes
+# -----------------------
+@app.route('/signup', methods=['GET', 'POST'])
+@cross_origin()
+@network_safe
+def signup():
+	from flask import current_app
+	current_use_supabase = current_app.config.get('USE_SUPABASE', True)
+	
+	print(f"[DEBUG] Signup route called. Method: {request.method}, USE_SUPABASE: {current_use_supabase}")
+
+	if request.method == 'POST':
+		email = request.form.get('email')
+		password = request.form.get('password')
+		confirm_password = request.form.get('confirm_password')
+		username = request.form.get('username')
+
+		print(f"[DEBUG] Signup form data - Email: {email}, Username: {username}")
+
+		# Validation
+		if not email or not password or not confirm_password or not username:
+			flash('All fields are required.', 'danger')
+			return render_template('auth/signup.html')
+
+		if password != confirm_password:
+			flash('Passwords do not match.', 'danger')
+			return render_template('auth/signup.html')
+
+		if len(password) < 6:
+			flash('Password must be at least 6 characters.', 'danger')
+			return render_template('auth/signup.html')
+
+		if len(username) < 3:
+			flash('Username must be at least 3 characters.', 'danger')
+			return render_template('auth/signup.html')
+
+		# Check if email already exists in fallback storage
+		if email in fallback_users:
+			flash('Email already registered. Please login instead.', 'warning')
+			return render_template('auth/signup.html')
+
+		# If Supabase is available, try it first
+		if current_use_supabase and supabase_client:
+			try:
+				# Sign up with Supabase
+				response = supabase_client.auth.sign_up({
+					'email': email,
+					'password': password,
+					'options': {
+						'data': {
+							'username': username,
+							'created_at': datetime.utcnow().isoformat()
+						}
+					}
+				})
+
+				if response.user:
+					flash('Account created successfully! Please check your email to verify your account.', 'success')
+					return redirect(url_for('login'))
+				else:
+					flash('Error creating account. Please try again.', 'danger')
+
+			except Exception as e:
+				error_msg = str(e).lower()
+				print(f"[AUTH ERROR] Supabase signup failed: {e}")  # Debug logging
+
+				if 'getaddrinfo' in error_msg or 'network' in error_msg or 'connection' in error_msg:
+					print("[INFO] Switching to fallback authentication due to network error")
+					current_app.config['USE_SUPABASE'] = False
+					flash('Network connection error. Using local authentication for testing.', 'warning')
+				else:
+					flash('An error occurred during signup. Please try again.', 'danger')
+					return render_template('auth/signup.html')
+
+		# Fallback authentication (when Supabase is unavailable or failed)
+		# Use the current app config flag rather than stale global variable
+		if not current_app.config.get('USE_SUPABASE', True):
+			print(f"[INFO] Using fallback authentication for signup: {email}")
+			print(f"[DEBUG] Current fallback_users count: {len(fallback_users)}")
+
+			# Create user in fallback storage
+			user_id = secrets.token_hex(16)
+			fallback_users[email] = {
+				'id': user_id,
+				'email': email,
+				'username': username,
+				'password_hash': hashlib.sha256(password.encode()).hexdigest(),
+				'created_at': datetime.utcnow().isoformat(),
+				'verified': True  # Skip email verification for testing
+			}
+
+			print(f"[SUCCESS] Created fallback user: {email} (ID: {user_id})")
+			print(f"[DEBUG] Updated fallback_users count: {len(fallback_users)}")
+			flash('Account created successfully! You can now login.', 'success')
+			return redirect(url_for('login'))
+
+		# If we get here, something went wrong
+		flash('Unable to create account. Please try again.', 'danger')
+
+	return render_template('auth/signup.html')
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+	# If already logged in, don't show login page again
+	# Fix: check the actual session key set on login ('user_id')
+	if 'user_id' in session:
+		return redirect(url_for('home'))
+
+	from flask import current_app
+	current_use_supabase = current_app.config.get('USE_SUPABASE', True)
+	
+	print(f"[DEBUG] Login route called. Method: {request.method}, USE_SUPABASE: {current_use_supabase}")
+
+	if request.method == 'POST':
+		email = request.form.get('email')
+		password = request.form.get('password')
+
+		print(f"[DEBUG] Login form data - Email: {email}")
+
+		if not email or not password:
+			flash('Email and password are required.', 'danger')
+			return render_template('auth/login.html')
+
+		# If Supabase is available, try it first
+		if current_use_supabase and supabase_client:
+			try:
+				# Sign in with Supabase
+				response = supabase_client.auth.sign_in_with_password({
+					'email': email,
+					'password': password
+				})
+
+				if response.user:
+					# Store user info in session (use helper)
+					_set_session_user(response.user.id, response.user.email,
+									  response.user.user_metadata.get('username', 'User') if response.user.user_metadata else 'User')
+
+					flash('Logged in successfully!', 'success')
+
+					# Redirect to next page or home (dashboard removed)
+					next_page = request.args.get('next')
+					if next_page:
+						return redirect(next_page)
+					return redirect(url_for('home'))
+				else:
+					flash('Invalid email or password.', 'danger')
+
+			except Exception as e:
+				error_msg = str(e).lower()
+				print(f"[AUTH ERROR] Supabase login failed: {e}")  # Debug logging
+
+				if 'getaddrinfo' in error_msg or 'network' in error_msg or 'connection' in error_msg:
+					print("[INFO] Switching to fallback authentication due to network error")
+					current_app.config['USE_SUPABASE'] = False
+					flash('Network connection error. Using local authentication for testing.', 'warning')
+				else:
+					flash('Login failed. Please check your credentials and try again.', 'danger')
+					return render_template('auth/login.html')
+
+		# Fallback authentication (when Supabase is unavailable)
+		if not current_app.config.get('USE_SUPABASE', True):
+			print(f"[INFO] Using fallback authentication for login: {email}")
+			print(f"[DEBUG] Checking if email exists in fallback_users: {email in fallback_users}")
+
+			if email in fallback_users:
+				user_data = fallback_users[email]
+				print(f"[DEBUG] Found user data: {user_data['email']}")
+
+				# Verify password
+				password_hash = hashlib.sha256(password.encode()).hexdigest()
+				stored_hash = user_data['password_hash']
+				print(f"[DEBUG] Password verification: input hash matches stored hash: {password_hash == stored_hash}")
+
+				if password_hash == stored_hash:
+					# Store user info in session via helper
+					_set_session_user(user_data['id'], user_data['email'], user_data['username'])
+
+					print(f"[SUCCESS] Fallback login successful for: {email}")
+					flash('Logged in successfully!', 'success')
+
+					# Redirect to next page or home (dashboard removed)
+					next_page = request.args.get('next')
+					if next_page:
+						return redirect(next_page)
+					return redirect(url_for('home'))
+				else:
+					print(f"[ERROR] Password mismatch for: {email}")
+					flash('Invalid email or password.', 'danger')
+			else:
+				print(f"[ERROR] Email not found in fallback_users: {email}")
+				flash('Invalid email or password.', 'danger')
+
+	return render_template('auth/login.html')
+
+@app.route('/logout')
+def logout():
+    from flask import current_app
+    current_use_supabase = current_app.config.get('USE_SUPABASE', True)
+    
+    if current_use_supabase and supabase_client:
+        try:
+            supabase_client.auth.sign_out()
+        except:
+            pass
+
+    session.clear()
+    flash('You have been logged out.', 'info')
+    return redirect(url_for('home'))
+
+@app.route('/profile')
+@login_required
+def profile():
+	from flask import current_app
+	current_use_supabase = current_app.config.get('USE_SUPABASE', True)
+	
+	if current_use_supabase and supabase_client:
+		try:
+			user_response = supabase_client.auth.get_user()
+			return render_template('auth/profile.html', user=user_response.user)
+		except Exception as e:
+			flash(f'Error loading profile: {str(e)}', 'danger')
+			# dashboard removed — use home
+			return redirect(url_for('home'))
+	else:
+		# Use fallback user data
+		user_email = session.get('user_email')
+		if user_email and user_email in fallback_users:
+			user_data = fallback_users[user_email]
+			# Create a mock user object for template compatibility
+			class MockUser:
+				def __init__(self, data):
+					self.id = data['id']
+					self.email = data['email']
+					self.user_metadata = {'username': data['username']}
+					self.created_at = data['created_at']
+
+			mock_user = MockUser(user_data)
+			return render_template('auth/profile.html', user=mock_user)
+		else:
+			flash('User data not found.', 'danger')
+			return redirect(url_for('home'))
+
+@app.route('/update-profile', methods=['POST'])
+@login_required
+def update_profile():
+    from flask import current_app
+    current_use_supabase = current_app.config.get('USE_SUPABASE', True)
+    
+    username = request.form.get('username')
+
+    if not username or len(username.strip()) < 3:
+        flash('Username must be at least 3 characters.', 'danger')
+        return redirect(url_for('profile'))
+
+    if current_use_supabase and supabase_client:
+        try:
+            response = supabase_client.auth.update_user({
+                'data': {'username': username}
+            })
+
+            if response.user:
+                session['user_username'] = username
+                flash('Profile updated successfully!', 'success')
+            else:
+                flash('Error updating profile.', 'danger')
+
+        except Exception as e:
+            flash(f'Error: {str(e)}', 'danger')
+    else:
+        # Update fallback user data
+        user_email = session.get('user_email')
+        if user_email and user_email in fallback_users:
+            fallback_users[user_email]['username'] = username.strip()
+            session['user_username'] = username
+            flash('Profile updated successfully!', 'success')
+        else:
+            flash('User data not found.', 'danger')
+
+    return redirect(url_for('profile'))
+
+
+
+# -----------------------
+# Public Routes
+# -----------------------
+@app.route('/')
 def home():
+    # If user is not logged in, redirect to login page
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
     return render_template('home.html')
 
+@app.route('/about')
+def about():
+    return render_template('about.html')
 
+@app.route('/blog')
+def blog():
+    return render_template('blog.html')
+
+@app.route('/contact')
+def contact():
+    return render_template('contact.html')
+
+# -----------------------
+# Protected Routes
+# -----------------------
 @app.route('/input', methods=['GET', 'POST'])
 @app.route('/analyser/input', methods=['GET', 'POST'])
+@login_required
 def input_page():
-    # Keep original input page behavior (unchanged from your version)
+    # Enhanced input page with user tracking
     sentiment = ""
     hate_speech = ""
     input_text = ""
@@ -138,7 +586,7 @@ def input_page():
             hate_score["Hate Speech"] = 100
             hate_score["None"] = 0
 
-        # charts code (same as before)
+        # charts code
         labels = ['Positive', 'Neutral', 'Negative']
         values = [sentiment_score['Positive'], sentiment_score['Neutral'], sentiment_score['Negative']]
         fig_bar_sentiment = go.Figure(data=[go.Bar(x=labels, y=values, text=[f'{v:.0f}%' for v in values], textposition='auto', hoverinfo='y+text')])
@@ -191,38 +639,24 @@ def input_page():
         offensive_words_found=[]
     )
 
-
-@app.route('/about', methods=['GET'])
-def about():
-    return render_template('about.html')
-
-
-@app.route('/blog', methods=['GET'])
-def blog():
-    return render_template('blog.html')
-
-
-@app.route('/contact', methods=['GET'])
-def contact():
-    return render_template('contact.html')
-
-
-@app.route('/dashboard', methods=['GET'])
+@app.route('/dashboard')
+@login_required
 def dashboard():
-    return render_template('dashboard.html')
+	# Dashboard page removed — preserve link behavior by sending user to home
+	return redirect(url_for('home'))
 
-
-@app.route('/export', methods=['GET'])
+@app.route('/export')
+@login_required
 def export():
-    return render_template('export.html')
-
+	# Export page removed — redirect to home
+	return redirect(url_for('home'))
 
 # -----------------------
-# Robust YouTube analysis route
+# Enhanced YouTube Analysis Route
 # -----------------------
 @app.route('/youtube-analysis', methods=['GET', 'POST'])
+@login_required
 def youtube_analysis():
-    # helper to convert any Jinja Undefined or odd objects to safe python types
     def _make_json_safe(o):
         if o is None:
             return None
@@ -253,18 +687,12 @@ def youtube_analysis():
         except Exception:
             return None
 
-    # -------------------------
-    # Escape/normalize strings to avoid embedding-breaking content
-    # (escape closing </script> and convert raw newlines to escaped sequences)
-    # -------------------------
     def _escape_script_tags_in_obj(o):
         if o is None:
             return None
-        # primitives
         if isinstance(o, (int, float, bool)):
             return o
         if isinstance(o, str):
-            # Prevent breaking the <script type="application/json"> block in templates.
             return o.replace('</script>', '<\\/script>').replace('\r', '\\r').replace('\n', '\\n')
         if isinstance(o, dict):
             return {k: _escape_script_tags_in_obj(v) for k, v in o.items()}
@@ -272,7 +700,6 @@ def youtube_analysis():
             return [_escape_script_tags_in_obj(v) for v in o]
         if isinstance(o, tuple):
             return tuple(_escape_script_tags_in_obj(v) for v in o)
-        # fallback: try to stringify safely
         try:
             return str(o)
         except Exception:
@@ -296,7 +723,6 @@ def youtube_analysis():
             if not video_id and not channel_id:
                 return render_template('youtube_analysis.html', results={'error': 'Invalid YouTube URL or ID. Please provide a valid video URL or channel ID.'})
 
-            # fetch comments from helper
             if video_id:
                 comments_data = get_comments_by_video(video_id, past_days)
             else:
@@ -309,7 +735,6 @@ def youtube_analysis():
             if len(comments_data) == 0:
                 return render_template('youtube_analysis.html', results={'error': 'No comments returned from YouTube for given input.'})
 
-            # run prediction per comment
             normalized_comments = []
             for raw in comments_data:
                 text = (raw.get('text') or '').strip()
@@ -358,16 +783,13 @@ def youtube_analysis():
             if not normalized_comments:
                 return render_template('youtube_analysis.html', results={'error': 'No valid comment text found (all empty).'})
 
-            # analyze, aggregate
             analyzed_comments = analyze_comments_sentiment_hate(normalized_comments)
             kpis = calculate_kpis(analyzed_comments)
             timeline_data = prepare_timeline_data(analyzed_comments, past_days)
             insights = generate_insights(analyzed_comments, past_days)
 
-            # debug
             print("[DEBUG] sentiment counts:", {s: sum(1 for c in analyzed_comments if c['sentiment'] == s) for s in ('Positive','Neutral','Negative')})
 
-            # prepare distributions expected by template & JS
             sentiment_distribution = {
                 'Positive': sum(1 for c in analyzed_comments if c['sentiment'] == 'Positive'),
                 'Neutral':  sum(1 for c in analyzed_comments if c['sentiment'] == 'Neutral'),
@@ -378,7 +800,6 @@ def youtube_analysis():
                 'Hate Speech':  sum(1 for c in analyzed_comments if c['hate_speech'] == 'Hate Speech'),
             }
 
-            # Build results dict with JSON-safe simple types and also convenience top-level KPIs that template expects
             results = {
                 'kpis': kpis,
                 'total_comments': len(analyzed_comments),
@@ -386,32 +807,23 @@ def youtube_analysis():
                 'timeline_data': timeline_data,
                 'insights': insights,
                 'error': None,
-                # convenience top-level fields used in your template
                 'hate_percentage': kpis.get('hate_speech_pct', 0.0),
                 'positive_percentage': kpis.get('positive_pct', 0.0),
                 'negative_percentage': kpis.get('negative_pct', 0.0),
                 'neutral_percentage': kpis.get('neutral_pct', 0.0),
-                # distributions consumed by JS (names match youtube_analysis.html expected keys)
                 'sentiment_distribution': sentiment_distribution,
                 'hate_distribution': hate_distribution,
-                # charts HTML (we're not relying on these in template's Chart.js; they are optional)
                 'charts': {
                     'pie_sent': str(pio.to_html(go.Figure(), full_html=False)),
                 }
             }
 
-            # Markup HTML versions for direct insertion if needed by template
             charts_html = {
                 'pie_sent': Markup(str(pio.to_html(go.Figure(), full_html=False))),
             }
 
-            # Ensure there is no Jinja Undefined left
             safe_results = _make_json_safe(results)
-
-            # SANITIZE strings so embedding inside <script type="application/json"> won't break
             safe_results = _escape_script_tags_in_obj(safe_results)
-
-            # return to template (charts_html is Markup for any direct insertion)
             results_json = json.dumps(safe_results)
             return render_template('youtube_analysis.html', results=safe_results, charts=charts_html, results_json=results_json)
 
@@ -422,8 +834,30 @@ def youtube_analysis():
             print(traceback.format_exc())
             return render_template('youtube_analysis.html', results={'error': error_message})
 
-    # GET
     return render_template('youtube_analysis.html', results=None)
+
+# -----------------------
+# API Routes
+# -----------------------
+@app.route('/api/user-info')
+@login_required
+def api_user_info():
+    return jsonify({
+        'user_id': session.get('user_id'),
+        'email': session.get('user_email'),
+        'username': session.get('user_username')
+    })
+
+# -----------------------
+# Error Handlers
+# -----------------------
+@app.errorhandler(404)
+def not_found_error(error):
+    return render_template('errors/404.html'), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    return render_template('errors/500.html'), 500
 
 # -----------------------
 # Run server
