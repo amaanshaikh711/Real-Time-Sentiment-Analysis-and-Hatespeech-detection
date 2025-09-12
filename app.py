@@ -43,6 +43,71 @@ from helpers.analysis import (
     calculate_kpis
 )
 
+# Ensure twitter utils import
+from twitter_utils import fetch_tweets
+
+import pathlib
+
+# --- Simple file-backed analytics store (safe, local fallback) ---
+ANALYTICS_PATH = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'data', 'user_analyses.json')
+pathlib.Path(os.path.dirname(ANALYTICS_PATH)).mkdir(parents=True, exist_ok=True)
+
+def _load_analytics():
+    try:
+        if os.path.exists(ANALYTICS_PATH):
+            with open(ANALYTICS_PATH, 'r', encoding='utf-8') as f:
+                return json.load(f)
+    except Exception:
+        return {}
+    return {}
+
+def _save_analytics(d):
+    try:
+        with open(ANALYTICS_PATH, 'w', encoding='utf-8') as f:
+            json.dump(d, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+def append_user_analysis(user_id, record: dict):
+    if not user_id:
+        return
+    data = _load_analytics()
+    user_key = str(user_id)
+    if user_key not in data:
+        data[user_key] = []
+    data[user_key].append(record)
+    _save_analytics(data)
+
+def get_user_stats(user_id):
+    data = _load_analytics()
+    user_key = str(user_id)
+    items = data.get(user_key, [])
+    analyses = len(items)
+    hate = 0
+    safe = 0
+    for it in items:
+        # summary may contain hate_count or hate_pct
+        if isinstance(it, dict):
+            hc = it.get('hate_count') or 0
+            total = it.get('total') or it.get('total_comments') or 0
+            if hc and total:
+                hate += int(hc)
+                safe += int(total) - int(hc)
+            else:
+                # fallback: look for a 'hate' flag per tweet list
+                tweets = it.get('tweets') or []
+                if tweets:
+                    for t in tweets:
+                        if t.get('hate'):
+                            hate += 1
+                        else:
+                            safe += 1
+    return {
+        'analyses': analyses,
+        'hate_count': hate,
+        'safe_count': safe
+    }
+
 # Initialize Flask app
 template_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'static', 'templates')
 app = Flask(__name__, static_folder='static', template_folder=template_dir)
@@ -396,35 +461,37 @@ def logout():
 @app.route('/profile')
 @login_required
 def profile():
-	from flask import current_app
-	current_use_supabase = current_app.config.get('USE_SUPABASE', True)
-	
-	if current_use_supabase and supabase_client:
-		try:
-			user_response = supabase_client.auth.get_user()
-			return render_template('auth/profile.html', user=user_response.user)
-		except Exception as e:
-			flash(f'Error loading profile: {str(e)}', 'danger')
-			# dashboard removed — use home
-			return redirect(url_for('home'))
-	else:
-		# Use fallback user data
-		user_email = session.get('user_email')
-		if user_email and user_email in fallback_users:
-			user_data = fallback_users[user_email]
-			# Create a mock user object for template compatibility
-			class MockUser:
-				def __init__(self, data):
-					self.id = data['id']
-					self.email = data['email']
-					self.user_metadata = {'username': data['username']}
-					self.created_at = data['created_at']
+    from flask import current_app
+    current_use_supabase = current_app.config.get('USE_SUPABASE', True)
 
-			mock_user = MockUser(user_data)
-			return render_template('auth/profile.html', user=mock_user)
-		else:
-			flash('User data not found.', 'danger')
-			return redirect(url_for('home'))
+    if current_use_supabase and supabase_client:
+        try:
+            user_response = supabase_client.auth.get_user()
+            stats = get_user_stats(session.get('user_id'))
+            return render_template('auth/profile.html', user=user_response.user, stats=stats)
+        except Exception as e:
+            flash(f'Error loading profile: {str(e)}', 'danger')
+            # dashboard removed — use home
+            return redirect(url_for('home'))
+    else:
+        # Use fallback user data
+        user_email = session.get('user_email')
+        if user_email and user_email in fallback_users:
+            user_data = fallback_users[user_email]
+            # Create a mock user object for template compatibility
+            class MockUser:
+                def __init__(self, data):
+                    self.id = data['id']
+                    self.email = data['email']
+                    self.user_metadata = {'username': data['username']}
+                    self.created_at = data['created_at']
+
+            mock_user = MockUser(user_data)
+            stats = get_user_stats(mock_user.id)
+            return render_template('auth/profile.html', user=mock_user, stats=stats)
+        else:
+            flash('User data not found.', 'danger')
+            return redirect(url_for('home'))
 
 @app.route('/update-profile', methods=['POST'])
 @login_required
@@ -818,6 +885,13 @@ def youtube_analysis():
                 }
             }
 
+            # Persist YouTube analysis summary for the current user
+            try:
+                user_id = session.get('user_id')
+                append_user_analysis(user_id, {'source': 'youtube', 'kpis': kpis, 'total_comments': len(analyzed_comments)})
+            except Exception:
+                pass
+
             charts_html = {
                 'pie_sent': Markup(str(pio.to_html(go.Figure(), full_html=False))),
             }
@@ -835,6 +909,126 @@ def youtube_analysis():
             return render_template('youtube_analysis.html', results={'error': error_message})
 
     return render_template('youtube_analysis.html', results=None)
+
+
+# -----------------------
+# Twitter Analysis Route
+# -----------------------
+@app.route('/twitter-analysis', methods=['GET', 'POST'])
+@login_required
+def twitter_analysis():
+    query = ""
+    # Keep tweets None on initial GET so the template can hide results until the user submits the form
+    tweets = None
+    sentiment_counts = {"positive": 0, "neutral": 0, "negative": 0}
+    hate_percentage = 0.0
+
+    if request.method == 'POST':
+        # Support both form POSTs (regular submit) and JSON POST from the new JS
+        is_json = request.is_json
+        if is_json:
+            payload = request.get_json() or {}
+            query = (payload.get('query') or '').strip()
+            try:
+                max_results = int(payload.get('max_results') or payload.get('max') or 30)
+            except Exception:
+                max_results = 30
+        else:
+            query = (request.form.get('query') or '').strip()
+            try:
+                max_results = int(request.form.get('max_results') or 30)
+            except Exception:
+                max_results = 30
+
+        if not query:
+            if not is_json:
+                flash('Please enter a search query.', 'warning')
+            else:
+                return jsonify({'error': 'Please enter a search query.'}), 400
+        else:
+            # Use resilient fetch that will fall back to cache or mock on errors.
+            from twitter_utils import fetch_tweets_resilient, load_tweets_cache, mock_tweets
+            _source = 'empty'
+            try:
+                tweets, _source = fetch_tweets_resilient(query, max_results=max_results, use_cache=True, allow_mock=True)
+            except Exception as e:
+                # Log and fall back to cache or mock explicitly
+                app.logger.exception('Error fetching tweets (resilient attempt failed)')
+                # Try cache
+                try:
+                    cached = load_tweets_cache(query)
+                    if cached:
+                        tweets = cached
+                        _source = 'cache'
+                    else:
+                        tweets = mock_tweets(query, count=min(10, int(max_results or 10)))
+                        _source = 'mock'
+                except Exception:
+                    tweets = mock_tweets(query, count=min(10, int(max_results or 10)))
+                    _source = 'mock'
+
+            hate_count = 0
+            if tweets:
+                for t in tweets:
+                    text = t.get('text', '')
+                    try:
+                        sent = predict(text, mode='sentiment')
+                    except Exception:
+                        sent = None
+                    try:
+                        hate = predict(text, mode='hate')
+                    except Exception:
+                        hate = None
+
+                    sent_label = 'neutral'
+                    if sent:
+                        s = str(sent).lower()
+                        if s.startswith('pos') or 'positive' in s:
+                            sent_label = 'positive'
+                        elif s.startswith('neg') or 'negative' in s:
+                            sent_label = 'negative'
+
+                    hate_flag = False
+                    if hate:
+                        hv = str(hate).lower()
+                        if hv.startswith('hate') or 'hate' in hv or hv in ('offensive','abusive'):
+                            hate_flag = True
+
+                    sentiment_counts[sent_label] = sentiment_counts.get(sent_label, 0) + 1
+                    if hate_flag:
+                        hate_count += 1
+
+                    t['sentiment'] = sent_label
+                    t['hate'] = bool(hate_flag)
+
+                total = max(1, len(tweets))
+                hate_percentage = round(100.0 * hate_count / total, 2)
+                # Build JSON summary for API responses
+                if is_json:
+                    total_count = len(tweets)
+                    positive_count = sentiment_counts.get('positive', 0)
+                    neutral_count = sentiment_counts.get('neutral', 0)
+                    negative_count = sentiment_counts.get('negative', 0)
+                    summary = {
+                        'total': total_count,
+                        'hate_count': hate_count,
+                        'hate_pct': hate_percentage,
+                        'positive_count': positive_count,
+                        'neutral_count': neutral_count,
+                        'negative_count': negative_count,
+                        'positive_pct': round(100.0 * positive_count / total_count, 2) if total_count else 0,
+                        'neutral_pct': round(100.0 * neutral_count / total_count, 2) if total_count else 0,
+                        'negative_pct': round(100.0 * negative_count / total_count, 2) if total_count else 0,
+                    }
+                    # Persist result for the current user (fallback to session user id)
+                    try:
+                        user_id = session.get('user_id')
+                        append_user_analysis(user_id, {'source': _source, 'summary': summary, 'tweets': tweets, 'total': total_count, 'hate_count': hate_count})
+                    except Exception:
+                        pass
+                    return jsonify({'summary': summary, 'tweets': tweets, 'source': _source})
+
+    return render_template('twitter.html', query=query, tweets=tweets, sentiment_counts=sentiment_counts, hate_percentage=hate_percentage)
 
 # -----------------------
 # API Routes

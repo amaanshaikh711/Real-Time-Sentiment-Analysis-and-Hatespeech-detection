@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<!-- Clean, YouTube-like Twitter analysis UI -->
+<style>
+    footer, .site-footer { position: static !important; z-index: 1 !important; }
+    .twitter-analysis-container { position: relative; z-index: 2; padding: 24px 40px; }
+    .glass-card { background: rgba(11,11,20,0.6); border-radius: 14px; padding: 22px; box-shadow: 0 8px 30px rgba(2,6,23,0.6); border: 1px solid rgba(255,255,255,0.03); }
+    .input-field { background:#06060a; color:#fff; border:1px solid #252531; padding:14px 16px; border-radius:10px; width:100%; }
+    .start-btn { background: linear-gradient(90deg,#1DA1F2,#0a84d6); color:#fff; padding:12px 26px; border-radius:10px; border:none; cursor:pointer; font-weight:800; display:inline-flex; align-items:center; gap:10px; }
+    .summary-cards { display:flex; gap:18px; margin-top:22px; }
+    .summary-card { flex:1; background:rgba(255,255,255,0.02); padding:20px; border-radius:12px; text-align:center; box-shadow: 0 6px 20px rgba(2,6,23,0.6); border:1px solid rgba(255,255,255,0.02); }
+    .chart-row { display:flex; gap:18px; margin-top:18px; }
+    .chart-card { flex:1; background:rgba(255,255,255,0.02); padding:18px; border-radius:12px; }
+    .tweet-card { background:#0f0f16; color:#fff; padding:12px; border-radius:10px; margin-bottom:12px; border:1px solid #222; }
+    .muted-note { color:#aab0bd; margin-top:8px; }
+    #resultsArea { display:none; }
+</style>
+
+<div class="twitter-analysis-container">
+  <div class="text-center">
+    <h1 style="font-size:40px; color:#e6eefc; margin-bottom:6px;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="34" height="34" style="vertical-align:middle; margin-right:8px; fill:white;"><path d="M23 3a10.9 10.9 0 0 1-3.14 1.53A4.48 4.48 0 0 0 22.43.36a9.03 9.03 0 0 1-2.88 1.1A4.52 4.52 0 0 0 12.07 5.5 12.84 12.84 0 0 1 1.64 2.16 4.5 4.5 0 0 0 2.89 8.8 4.44 4.44 0 0 1 .89 8.27v.06A4.52 4.52 0 0 0 4.5 13.8a4.5 4.5 0 0 1-2.04.08 4.53 4.53 0 0 0 4.22 3.14A9.06 9.06 0 0 1 1 19.54 12.8 12.8 0 0 0 7.03 21c8.42 0 13.02-7 13.02-13.06 0-.2 0-.39-.02-.58A9.2 9.2 0 0 0 23 3z"/></svg>Twitter Analysis</h1>
+    <p style="color:#bfc8d8; margin-bottom:18px; font-size:16px;">Analyze tweets for hate speech and sentiment patterns using advanced AI detection</p>
+  </div>
+
+  <div class="glass-card">
+    <div style="display:flex; gap:18px; align-items:center;">
+      <div style="flex:1;">
+        <label class="text-white font-semibold">Enter the Username or Hashtag</label>
+        <input id="queryInput" class="input-field" placeholder="@username or #hashtag" value="{{ query or '' }}">
+      </div>
+
+      <div style="width:160px;">
+        <label class="text-white font-semibold">Max Tweets</label>
+        <input id="maxTweets" class="input-field" type="number" min="1" max="200" value="10">
+      </div>
+    </div>
+
+    <div style="text-align:center; margin-top:18px;">
+      <button id="startAnalysis" class="start-btn" style="min-width:220px;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg"><path d="M10 8.64L15.27 12 10 15.36V8.64z"/></svg>
+        START ANALYSIS
+      </button>
+    </div>
+  </div>
+
+  <div id="resultsArea">
+    <div id="resultsNotice" style="text-align:center; color:#cbd6e6; margin-bottom:8px; display:none;"></div>
+    <div class="summary-cards">
+      <div class="summary-card">
+        <div style="font-size:28px; font-weight:700;">0</div>
+        <div class="muted-note">Total Tweets</div>
+      </div>
+      <div class="summary-card">
+        <div style="font-size:28px; font-weight:700;">0%</div>
+        <div class="muted-note">Hate Speech</div>
+      </div>
+      <div class="summary-card">
+        <div style="font-size:28px; font-weight:700;">0%</div>
+        <div class="muted-note">Positive</div>
+      </div>
+    </div>
+
+    <div class="chart-row">
+      <div class="chart-card">
+        <canvas id="sentimentPie"></canvas>
+      </div>
+      <div class="chart-card">
+        <canvas id="hateBar"></canvas>
+      </div>
+    </div>
+
+    <div style="margin-top:20px">
+      <h3 style="color:#dbe6ff;">Tweets</h3>
+      <div id="tweetsList"></div>
+    </div>
+
+    <div style="margin-top:18px">
+      <a class="start-btn" href="#" id="downloadCsv" style="background:transparent; border:1px solid rgba(255,255,255,0.06); color:#fff;">⬇ DOWNLOAD CSV</a>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+function renderResults(data){
+  document.getElementById('resultsArea').style.display = 'block';
+  const pieCtx = document.getElementById('sentimentPie').getContext('2d');
+  new Chart(pieCtx, { type: 'pie', data: { labels:['Positive','Neutral','Negative'], datasets:[{ data:[data.positive||0, data.neutral||0, data.negative||0], backgroundColor:['#2ecc71','#9aa1ad','#e74c3c'] }] }, options:{ responsive:true } });
+  const barCtx = document.getElementById('hateBar').getContext('2d');
+  new Chart(barCtx, { type: 'bar', data: { labels:['Hate','Not Hate'], datasets:[{ label:'Tweets', data:[data.hate_count||0, (data.total||0)-(data.hate_count||0)], backgroundColor:['#f1c40f','#34495e'] }] }, options:{ responsive:true } });
+}
+
+document.getElementById('startAnalysis').addEventListener('click', async function(){
+  const q = document.getElementById('queryInput').value.trim();
+  const max = parseInt(document.getElementById('maxTweets').value) || 10;
+  if(!q){ alert('Please enter a hashtag, keyword, or username'); return; }
+  this.disabled = true; this.textContent = 'Working...';
+  try{
+    const resp = await fetch("{{ url_for('twitter_analysis') }}", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ query: q, max_results: max })
+    });
+
+    // If server redirected to login HTML or returned HTML, show a helpful message
+    const contentType = (resp.headers.get('content-type') || '').toLowerCase();
+    if (!contentType.includes('application/json')) {
+      const text = await resp.text();
+      console.error('Non-JSON response from server:', text);
+      alert('Server returned an HTML page (maybe your session expired). Please log in and try again.');
+      this.disabled = false; this.textContent = 'START ANALYSIS';
+      return;
+    }
+
+    if (!resp.ok) {
+      const errJson = await resp.json().catch(()=>({ error: 'Server error' }));
+      throw new Error(errJson.error || 'Server error');
+    }
+
+    const json = await resp.json();
+    if (json.error) { throw new Error(json.error); }
+    // Show whether results are live/cache/mock
+    if (json.source) {
+      const note = document.getElementById('resultsNotice');
+      note.style.display = 'block';
+      note.textContent = json.source === 'live' ? 'Live results from Twitter API' : (json.source === 'cache' ? 'Showing cached results (may be slightly stale)' : 'Offline mock results (Twitter API unavailable)');
+    }
+    // update UI
+    const list = document.getElementById('tweetsList'); list.innerHTML = '';
+    (json.tweets || []).forEach(t=>{ const el = document.createElement('div'); el.className='tweet-card'; el.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;"><div style="max-width:85%">${t.text}</div><div><span class='sentiment-badge'>${t.sentiment}</span></div></div><div style='margin-top:8px;color:#9aa1ad;font-size:13px'>${t.username||''}</div>`; list.appendChild(el); });
+    // summary
+    document.querySelectorAll('.summary-card')[0].querySelector('div').textContent = json.summary.total || 0;
+    document.querySelectorAll('.summary-card')[1].querySelector('div').textContent = (json.summary.hate_pct||0) + '%';
+    document.querySelectorAll('.summary-card')[2].querySelector('div').textContent = (json.summary.positive_pct||0) + '%';
+    renderResults({ positive: json.summary.positive_count, neutral: json.summary.neutral_count, negative: json.summary.negative_count, hate_count: json.summary.hate_count, total: json.summary.total });
+  }catch(err){ console.error(err); alert('Analysis failed: '+err.message); }
+  this.disabled = false; this.textContent = 'START ANALYSIS';
+});
+</script>
+
+{% endblock %}
