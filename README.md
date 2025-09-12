@@ -113,14 +113,15 @@
 
 ### 📈 Analyser 
 
-![Analyser](screenshots/analyser 1.png)
-(screenshots/analyser 2.png)
+![Analyser 1](screenshots/analyser 1.png)
+![Analyser 2](screenshots/analyser 2.png)
 
 ### 📹 YouTube Comment Analysis
 
-![YouTube Analyzer](screenshots/youtube 1.png)
-(screenshots/youtube 2.png)
-(screenshots/youtube 3.png)
+![YouTube 1](screenshots/youtube 1.png)
+![YouTube 2](screenshots/youtube 2.png)
+![YouTube 3](screenshots/youtube 3.png)
+
 ### 🔑 Login & Signup
 
 ![Authentication](screenshots/login.png)
