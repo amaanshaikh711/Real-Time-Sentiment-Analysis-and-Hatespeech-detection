@@ -39,7 +39,7 @@
 
 ## 🚀 Overview
 
-**HateSense AI** is a cutting-edge web application that leverages advanced machine learning algorithms to detect and analyze hate speech, offensive content, and sentiment in real-time. Built with modern web technologies and a focus on user experience, it provides an intuitive interface for analyzing text content from various sources including social media posts, comments, and documents.
+**HateSense AI** is a full-featured web application that performs real-time sentiment analysis, hate speech detection, and YouTube comment analytics. Built with Flask and powered by Supabase authentication, it offers a secure, responsive dashboard for monitoring online toxicity and sentiment trends.
 
 ### 🎯 **Mission Statement**
 > *"To create a safer digital environment by providing accurate, real-time content analysis tools that help identify and mitigate harmful online content."*
@@ -58,6 +58,7 @@
 ### 🔍 **Advanced Content Analysis**
 - **Hate Speech Detection**: Identify harmful content with high precision
 - **Sentiment Analysis**: Classify text as Positive, Negative, or Neutral
+- **Youtube Comment Analysis**: YouTube Comment Fetching & Analysis
 - **Offensive Content Filtering**: Detect inappropriate language and content
 - **Toxicity Scoring**: Provide confidence levels for each classification
 
@@ -105,26 +106,24 @@
 ---
 
 ## 📊 Screenshots & Demo
+---
+### 🏠 Home Page
 
-### 🏠 **Home Page**
-![Home Page](https://via.placeholder.com/800x400/1a1a2e/ffffff?text=HateSense+AI+Home+Page)
+![Home Page](screenshots/homepage.png)
 
-*Professional landing page featuring project overview, statistics, and call-to-action sections*
+### 📈 Analyser 
 
-### 📈 **Analytics Dashboard**
-![Dashboard](https://via.placeholder.com/800x400/2a1b4d/ffffff?text=Real-time+Analytics+Dashboard)
+![Analyser](screenshots/analyser 1.png)
+(screenshots/analyser 2.png)
 
-*Interactive dashboard with live KPIs, charts, and detailed insights*
+### 📹 YouTube Comment Analysis
 
-### 📱 **Mobile Responsive**
-![Mobile View](https://via.placeholder.com/400x600/3d1f73/ffffff?text=Mobile+Responsive+Design)
+![YouTube Analyzer](screenshots/youtube 1.png)
+(screenshots/youtube 2.png)
+(screenshots/youtube 3.png)
+### 🔑 Login & Signup
 
-*Fully responsive design that works perfectly on all devices*
-
-### 🔍 **Analysis Interface**
-![Analysis](https://via.placeholder.com/800x400/111129/ffffff?text=Text+Analysis+Interface)
-
-*Real-time text analysis with instant results and recommendations*
+![Authentication](screenshots/login.png)
 
 ---
 
@@ -300,18 +299,19 @@ python train_models.py
 
 ### 🏠 **Getting Started**
 
-1. **Start the Application**
-   ```bash
-   # Make sure virtual environment is activated
-   python app.py
-   ```
+## 🔑 Authentication Flow
 
-2. **Access the Application**
-   - Open your web browser
-   - Navigate to: `http://127.0.0.1:5000`
-   - You should see the HateSense AI home page
+* **Sign Up / Login** using Supabase Auth
+* **JWT Session Tokens** ensure secure persistent login
+* **Logout** available from navbar
 
-### 📊 **Using the Analytics Dashboard**
+---
+
+## 📹 YouTube Comment Analysis
+
+* Paste a **YouTube video URL** in the Youtube Analyser
+* Click the Analyse button 
+* The app fetches top comments and runs **sentiment + toxicity analysis**
 
 #### **Single Text Analysis**
 1. Navigate to the "Analyzer" page
@@ -345,22 +345,15 @@ python train_models.py
 - Instant result display
 - Progress indicators
 
-#### **Export Functionality**
-- Download analysis results
-- Export charts as images
-- Save reports in multiple formats
-- Batch export capabilities
-
 ---
 
 ## 🔧 Configuration
 
-### **Flask Configuration**
-```python
-# app.py configuration options
-app.config['SECRET_KEY'] = 'your-secret-key'
-app.config['DEBUG'] = True
-app.config['TESTING'] = False
+Use `.env` file for API keys and secrets:
+
+```env
+SUPABASE_URL=your-supabase-url
+SUPABASE_KEY=your-anon-key
 ```
 
 ### **Model Configuration**
@@ -383,8 +376,6 @@ BATCH_SIZE = 32
 ```
 
 ---
-
-## 🧪 Testing
 
 ### **Running Tests**
 ```bash
