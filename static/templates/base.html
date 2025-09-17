@@ -138,13 +138,14 @@
     <div class="main-column flex flex-col flex-1 min-h-0">
       <main id="main-content" class="flex-1 p-2 transition-all duration-300 {% if not hide_sidebar|default(false) %}ml-56{% endif %} overflow-y-auto">
        
-      </main>
+     
+   {% block content %}{% endblock %}
+    </main>
       {% if not hide_sidebar|default(false) %}
-        <!-- {% include 'footer.html' %} -->
+        {% include 'footer.html' %}
       {% endif %}
     </div>
   </div>
-   {% block content %}{% endblock %}
   <!-- Sidebar Toggle Script -->
   <script>
     const toggleBtn = document.getElementById('toggleSidebar');

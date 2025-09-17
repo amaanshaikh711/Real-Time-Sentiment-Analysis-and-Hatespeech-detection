@@ -17,6 +17,8 @@
   max-width: 28rem;
   margin: 0 auto;
 }
+ 
+
 
 /* Ensure no left spacing on auth pages */
 body {
@@ -24,19 +26,23 @@ body {
   padding-left: 0 !important;
 }
 </style>
+
+<script src="https://unpkg.com/@lottiefiles/dotlottie-wc@0.6.2/dist/dotlottie-wc.js" type="module"></script>
+
 <div class="auth-container bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
   <div class="auth-card">
     <!-- Logo and Title -->
     <div class="text-center">
-      <lottie-player
-        src="https://assets3.lottiefiles.com/packages/lf20_UJNc2t.json"
-        background="transparent"
-        speed="1"
-        style="width: 120px; height: 120px; margin: 0 auto;"
-        loop
-        autoplay>
-      </lottie-player>
-      <h2 class="mt-6 text-3xl font-bold text-white">
+      <dotlottie-wc 
+  src="https://lottie.host/59d69073-0d6e-49e9-a74d-a94f1c78ab07/YoE87w1Z60.lottie" 
+  style="width: 230px; height: 230px; margin: 0 auto;" 
+  speed="1" 
+  autoplay 
+  loop>
+</dotlottie-wc>
+
+      <h2 class="mt-6 text-3xl font-bold text-white" style="
+    margin-top: -21px;">
         Welcome Back
       </h2>
       <p class="mt-2 text-sm text-gray-300">
@@ -62,7 +68,7 @@ body {
       <div class="space-y-4">
         <!-- Email -->
         <div>
-          <label for="email" class="block text-sm font-medium text-gray-300 mb-2">
+          <label for="email" class="block text-sm font-medium text-gray-300 mb-2" style="margin-top: -20px;">
             Email Address
           </label>
           <input
