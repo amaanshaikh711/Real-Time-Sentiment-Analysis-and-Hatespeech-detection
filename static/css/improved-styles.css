@@ -256,3 +256,41 @@
     padding: 14px 25px;
   }
 }
+
+/* Sidebar active link */
+.active-sidebar {
+  background: linear-gradient(90deg, rgba(138,43,226,0.12), rgba(106,90,205,0.06));
+  border-left: 4px solid #8a2be2;
+}
+
+/* Instagram / Analysis results table and badges */
+.table-results {
+  background: rgba(255,255,255,0.02);
+  border-radius: 12px;
+  width: 100%;
+}
+.table-results th { background: transparent; color: #d8c9ff; }
+.table-results td { color: #cfc6dd; }
+.sentiment-positive { color: #2ecc71; font-weight: 700; }
+.sentiment-negative { color: #e74c3c; font-weight: 700; }
+.sentiment-neutral { color: #95a5a6; font-weight: 700; }
+.hate-detected { color: #ff6b6b; font-weight: 800; background: rgba(231,76,60,0.06); padding: 6px 10px; border-radius: 8px; }
+.safe-content { color: #2ecc71; font-weight: 700; background: rgba(46,204,113,0.06); padding: 6px 10px; border-radius: 8px; }
+
+/* Ensure main content area has spacing to account for fixed sidebar */
+.main-content { margin-left: 240px; }
+
+/* Sidebar icon sizing and collapse behavior */
+#sidebar { width: 240px; }
+#sidebar .sidebar-icon, #sidebar svg { width: 36px; height: 36px; min-width:36px; min-height:36px; }
+#sidebar .sidebar-label { transition: opacity 0.18s ease, max-width 0.18s ease; }
+
+/* When sidebar is toggled to collapsed state (we add .collapsed via JS), hide labels but keep icons visible */
+#sidebar.collapsed { width: 68px !important; }
+#sidebar.collapsed .sidebar-label { opacity: 0; max-width: 0; overflow: hidden; width:0; display:inline-block; }
+#sidebar.collapsed a { justify-content: center; }
+#sidebar .flex.items-center svg { flex-shrink: 0; }
+
+/* Ensure charts and containers are responsive */
+.chart-container { background: rgba(0,0,0,0.02); border-radius: 12px; padding: 16px; }
+.chart-title { color: #e0caff; margin-bottom: 8px; font-weight:700; }

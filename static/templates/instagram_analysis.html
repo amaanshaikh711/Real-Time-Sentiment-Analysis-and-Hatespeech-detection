@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<!-- Instagram analysis page CSS to mirror YouTube page -->
+<style>
+  footer, .site-footer { position: static !important; z-index: 1 !important; }
+  .youtube-analysis-container { position: relative; z-index: 2; }
+  .chart-container { min-height: 260px; }
+  .chart-container canvas { min-height: 260px !important; height: 300px !important; width:100% !important; display:block; }
+  .table-results { width: 100%; border-collapse: collapse; }
+  .table-results th, .table-results td { padding: 12px 10px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .table-results th { text-align: left; color: #e0caff; }
+  .comment-text { max-width: 60ch; overflow-wrap: anywhere; }
+  .sentiment-positive { color: #2ecc71; font-weight: 700; }
+  .sentiment-negative { color: #e74c3c; font-weight: 700; }
+  .sentiment-neutral { color: #95a5a6; font-weight: 700; }
+  .hate-detected { color: #e74c3c; font-weight: 800; }
+  .safe-content { color: #2ecc71; font-weight: 700; }
+</style>
+
+<div class="youtube-analysis-container">
+  
+  <div class="youtube-header">
+    <h1 class="gradient-text">
+      <!-- Official Instagram glyph (styled to match header) -->
+      <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" style="vertical-align:middle; margin-right:10px;">
+        <rect x="2" y="2" width="20" height="20" rx="5" ry="5" fill="url(#iggrad)" />
+        <circle cx="12" cy="12" r="3.2" fill="#fff" />
+        <circle cx="17.5" cy="6.5" r="1" fill="#fff" />
+        <defs>
+          <linearGradient id="iggrad" x1="0" x2="1">
+            <stop offset="0%" stop-color="#f58529"/>
+            <stop offset="50%" stop-color="#dd2a7b"/>
+            <stop offset="100%" stop-color="#8134af"/>
+          </linearGradient>
+        </defs>
+      </svg>
+      Instagram Analysis</h1>
+    <p class="header-description">Fetch Instagram comments and analyze for hate speech and sentiment.</p>
+  </div>
+
+  <div class="analysis-form-container">
+    <form id="youtube-analysis-form" method="POST" class="youtube-form">
+      <div class="form-inputs-row">
+        <div class="input-group-3d" style="flex:1;">
+          <label for="instagram_urls" class="input-label">
+            <i class="fab fa-instagram"></i> Instagram Post / Reel URLs (one per line or comma separated)
+          </label>
+          <textarea id="instagram_urls" name="instagram_urls" class="glassmorphism-input-3d" rows="4" placeholder="https://www.instagram.com/p/XXXXXXXX/" required>{{ request.form.get('instagram_urls','') }}</textarea>
+        </div>
+        <div class="input-group-3d" style="width:160px;">
+          <label for="results_limit" class="input-label"><i class="fas fa-list-ol"></i> Limit</label>
+          <input type="number" id="results_limit" name="results_limit" value="50" min="1" max="500" class="glassmorphism-input-3d" />
+        </div>
+      </div>
+      <div class="form-button-container">
+        <button type="submit" class="analyze-btn-grad-3d">
+          <i class="fas fa-download"></i> Fetch Comments
+        </button>
+      </div>
+    </form>
+  </div>
+
+  {% if results is not none %}
+  <div class="results-container">
+    {% if results.error %}
+      <div class="error-message"><i class="fas fa-exclamation-triangle"></i> {{ results.error }}</div>
+    {% else %}
+      <div class="kpi-section" style="display:flex; gap:16px; margin-bottom:18px;">
+        <div class="kpi-card" style="flex:1;">
+          <div class="kpi-icon">📊</div>
+          <div class="kpi-content"><h3>{{ results.total_comments }}</h3><p>Total Comments</p></div>
+        </div>
+        <div class="kpi-card" style="flex:1;">
+          <div class="kpi-icon">⚠️</div>
+          <div class="kpi-content"><h3>{{ results.kpis.hate_speech_pct if results.kpis and results.kpis.hate_speech_pct is defined else '0' }}%</h3><p>Hate Speech</p></div>
+        </div>
+        <div class="kpi-card" style="flex:1;">
+          <div class="kpi-icon">😊</div>
+          <div class="kpi-content"><h3>{{ results.kpis.positive_pct if results.kpis and results.kpis.positive_pct is defined else '0' }}%</h3><p>Positive Sentiment</p></div>
+        </div>
+      </div>
+
+      <!-- Charts (identical structure to YouTube) -->
+      <div class="charts-section">
+        <div class="chart-container">
+          <h3 class="chart-title">Sentiment Distribution</h3>
+          <canvas id="sentimentChart"></canvas>
+        </div>
+        <div class="chart-container">
+          <h3 class="chart-title">Hate Speech Detection</h3>
+          <canvas id="hateChart"></canvas>
+        </div>
+        <div class="chart-container chart-full-width">
+          <h3 class="chart-title">Comment Activity Timeline</h3>
+          <canvas id="timelineChart"></canvas>
+        </div>
+      </div>
+
+      <h3 class="section-title">💬 Comments ({{ results.total_comments }})</h3>
+      <div style="overflow-x:auto;">
+        <table class="table-results">
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Comment</th>
+              <th>Timestamp</th>
+              <th>Sentiment</th>
+              <th>Hate</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for c in results.analyzed_comments %}
+            <tr>
+              <td>{{ c.username }}</td>
+              <td class="comment-text">{{ c.text }}</td>
+              <td>{{ c.date }}</td>
+              <td>
+                {% set s = (c.sentiment or 'Neutral').lower() %}
+                <span class="sentiment-{{ s }}">{{ c.sentiment }}</span>
+              </td>
+              <td>
+                {% if c.hate_speech and c.hate_speech.lower().startswith('hate') %}
+                  <span class="hate-detected">Hate Speech</span>
+                {% else %}
+                  <span class="safe-content">Safe</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{ url_for('static', filename='js/youtube_analysis.js') }}"></script>
+{% if results and not results.error %}
+  <script id="analysis-data" type="application/json">
+    {{ results_json | safe }}
+  </script>
+
+  <!-- Force stacked timeline and accurate hate bar for Instagram -->
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const el = document.getElementById('analysis-data');
+      if (!el) return;
+      let data = {};
+      try { data = JSON.parse(el.textContent || '{}'); } catch (_) {}
+
+      // Render using shared initializer
+      if (window.initializeCharts) {
+        window.initializeCharts(data);
+      }
+      // Overwrite with server-provided stacked P/N/N timeline
+      try {
+        if (data && data.timeline_data && data.timeline_data.labels) {
+          if (window.timelineChart && typeof window.timelineChart.destroy === 'function') window.timelineChart.destroy();
+          createTimelineChart(data.timeline_data);
+        }
+      } catch (e) { console.warn('IG timeline override failed', e); }
+
+      // Ensure hate bar uses server counts
+      try {
+        if (data && data.hate_distribution) {
+          if (window.hateChart && typeof window.hateChart.destroy === 'function') window.hateChart.destroy();
+          createHateChart(data.hate_distribution);
+        }
+      } catch (e) { console.warn('IG hate bar override failed', e); }
+    });
+  </script>
+{% endif %}
+
+{% endblock %}

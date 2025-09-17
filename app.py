@@ -7,6 +7,7 @@ import os
 import re
 import json
 import nltk
+import requests
 from functools import wraps
 from datetime import datetime, timedelta
 import hashlib
@@ -45,68 +46,7 @@ from helpers.analysis import (
 
 # Ensure twitter utils import
 from twitter_utils import fetch_tweets
-
-import pathlib
-
-# --- Simple file-backed analytics store (safe, local fallback) ---
-ANALYTICS_PATH = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'data', 'user_analyses.json')
-pathlib.Path(os.path.dirname(ANALYTICS_PATH)).mkdir(parents=True, exist_ok=True)
-
-def _load_analytics():
-    try:
-        if os.path.exists(ANALYTICS_PATH):
-            with open(ANALYTICS_PATH, 'r', encoding='utf-8') as f:
-                return json.load(f)
-    except Exception:
-        return {}
-    return {}
-
-def _save_analytics(d):
-    try:
-        with open(ANALYTICS_PATH, 'w', encoding='utf-8') as f:
-            json.dump(d, f, ensure_ascii=False, indent=2)
-    except Exception:
-        pass
-
-def append_user_analysis(user_id, record: dict):
-    if not user_id:
-        return
-    data = _load_analytics()
-    user_key = str(user_id)
-    if user_key not in data:
-        data[user_key] = []
-    data[user_key].append(record)
-    _save_analytics(data)
-
-def get_user_stats(user_id):
-    data = _load_analytics()
-    user_key = str(user_id)
-    items = data.get(user_key, [])
-    analyses = len(items)
-    hate = 0
-    safe = 0
-    for it in items:
-        # summary may contain hate_count or hate_pct
-        if isinstance(it, dict):
-            hc = it.get('hate_count') or 0
-            total = it.get('total') or it.get('total_comments') or 0
-            if hc and total:
-                hate += int(hc)
-                safe += int(total) - int(hc)
-            else:
-                # fallback: look for a 'hate' flag per tweet list
-                tweets = it.get('tweets') or []
-                if tweets:
-                    for t in tweets:
-                        if t.get('hate'):
-                            hate += 1
-                        else:
-                            safe += 1
-    return {
-        'analyses': analyses,
-        'hate_count': hate,
-        'safe_count': safe
-    }
+from apify_client import ApifyClient
 
 # Initialize Flask app
 template_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'static', 'templates')
@@ -125,6 +65,13 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True
 
 # Supabase configuration
 from config import SUPABASE_URL, SUPABASE_KEY, SUPABASE_SERVICE_KEY
+from config import APIFY_TOKEN
+
+# Safe log to confirm whether APIFY token was loaded into the process (do not print the token)
+if APIFY_TOKEN:
+    print("[INFO] APIFY token detected in process environment")
+else:
+    print("[WARNING] APIFY token not detected in process environment. Set APIFY_TOKEN in your environment or .env file.")
 
 # Use service key for admin operations, anon key for client operations
 SUPABASE_ANON_KEY = SUPABASE_KEY or SUPABASE_SERVICE_KEY
@@ -219,6 +166,7 @@ def load_user():
                 g.user = None
         else:
             # Use fallback user data
+            user_email = session.get('user_email')
             if user_email and user_email in fallback_users:
                 user_data = fallback_users[user_email]
                 g.user = {
@@ -461,37 +409,35 @@ def logout():
 @app.route('/profile')
 @login_required
 def profile():
-    from flask import current_app
-    current_use_supabase = current_app.config.get('USE_SUPABASE', True)
+	from flask import current_app
+	current_use_supabase = current_app.config.get('USE_SUPABASE', True)
+	
+	if current_use_supabase and supabase_client:
+		try:
+			user_response = supabase_client.auth.get_user()
+			return render_template('auth/profile.html', user=user_response.user)
+		except Exception as e:
+			flash(f'Error loading profile: {str(e)}', 'danger')
+			# dashboard removed — use home
+			return redirect(url_for('home'))
+	else:
+		# Use fallback user data
+		user_email = session.get('user_email')
+		if user_email and user_email in fallback_users:
+			user_data = fallback_users[user_email]
+			# Create a mock user object for template compatibility
+			class MockUser:
+				def __init__(self, data):
+					self.id = data['id']
+					self.email = data['email']
+					self.user_metadata = {'username': data['username']}
+					self.created_at = data['created_at']
 
-    if current_use_supabase and supabase_client:
-        try:
-            user_response = supabase_client.auth.get_user()
-            stats = get_user_stats(session.get('user_id'))
-            return render_template('auth/profile.html', user=user_response.user, stats=stats)
-        except Exception as e:
-            flash(f'Error loading profile: {str(e)}', 'danger')
-            # dashboard removed — use home
-            return redirect(url_for('home'))
-    else:
-        # Use fallback user data
-        user_email = session.get('user_email')
-        if user_email and user_email in fallback_users:
-            user_data = fallback_users[user_email]
-            # Create a mock user object for template compatibility
-            class MockUser:
-                def __init__(self, data):
-                    self.id = data['id']
-                    self.email = data['email']
-                    self.user_metadata = {'username': data['username']}
-                    self.created_at = data['created_at']
-
-            mock_user = MockUser(user_data)
-            stats = get_user_stats(mock_user.id)
-            return render_template('auth/profile.html', user=mock_user, stats=stats)
-        else:
-            flash('User data not found.', 'danger')
-            return redirect(url_for('home'))
+			mock_user = MockUser(user_data)
+			return render_template('auth/profile.html', user=mock_user)
+		else:
+			flash('User data not found.', 'danger')
+			return redirect(url_for('home'))
 
 @app.route('/update-profile', methods=['POST'])
 @login_required
@@ -885,13 +831,6 @@ def youtube_analysis():
                 }
             }
 
-            # Persist YouTube analysis summary for the current user
-            try:
-                user_id = session.get('user_id')
-                append_user_analysis(user_id, {'source': 'youtube', 'kpis': kpis, 'total_comments': len(analyzed_comments)})
-            except Exception:
-                pass
-
             charts_html = {
                 'pie_sent': Markup(str(pio.to_html(go.Figure(), full_html=False))),
             }
@@ -1020,15 +959,148 @@ def twitter_analysis():
                         'neutral_pct': round(100.0 * neutral_count / total_count, 2) if total_count else 0,
                         'negative_pct': round(100.0 * negative_count / total_count, 2) if total_count else 0,
                     }
-                    # Persist result for the current user (fallback to session user id)
-                    try:
-                        user_id = session.get('user_id')
-                        append_user_analysis(user_id, {'source': _source, 'summary': summary, 'tweets': tweets, 'total': total_count, 'hate_count': hate_count})
-                    except Exception:
-                        pass
+                    # include source info so the client can show 'live/cache/mock'
                     return jsonify({'summary': summary, 'tweets': tweets, 'source': _source})
 
     return render_template('twitter.html', query=query, tweets=tweets, sentiment_counts=sentiment_counts, hate_percentage=hate_percentage)
+
+
+# -----------------------
+# Instagram Analysis Route
+# -----------------------
+from config import APIFY_TOKEN
+
+
+@app.route('/instagram_analysis', methods=['GET', 'POST'])
+@app.route('/instagram-analysis', methods=['GET', 'POST'])
+@login_required
+def instagram_analysis():
+    results = None
+    results_json = '{}'
+
+    if request.method == 'POST':
+        urls_raw = request.form.get('instagram_urls', '')
+        urls = [u.strip() for u in re.split(r'[\n,]+', urls_raw) if u.strip()]
+        urls = urls[:10]
+
+        if not APIFY_TOKEN:
+            results = {'error': 'Apify API token not configured. Set APIFY_TOKEN in environment.'}
+            return render_template('instagram_analysis.html', results=results)
+
+        client = ApifyClient(APIFY_TOKEN)
+
+        run_input = {
+            'directUrls': urls,
+            'resultsLimit': int(request.form.get('results_limit', 50))
+        }
+
+        try:
+            run = client.actor('apify/instagram-comment-scraper').call(run_input=run_input)
+            dataset_id = run.get('defaultDatasetId')
+            comments = []
+            if dataset_id:
+                for item in client.dataset(dataset_id).iterate_items():
+                    comments.append({
+                        'username': item.get('username') or (item.get('user') or {}).get('username') or item.get('author'),
+                        'text': item.get('text') or item.get('comment'),
+                        'date': item.get('createdAt') or item.get('created_at') or item.get('date'),
+                    })
+
+            analyzed = []
+            for c in comments:
+                text = c.get('text') or ''
+                try:
+                    sent = predict(text, mode='sentiment')
+                except Exception:
+                    sent = None
+                try:
+                    hate_raw = predict(text, mode='hate')
+                except Exception:
+                    hate_raw = None
+
+                def map_sent(s):
+                    if not s:
+                        return 'Neutral'
+                    sv = str(s).strip().lower()
+                    if sv.startswith('pos') or 'positive' in sv:
+                        return 'Positive'
+                    if sv.startswith('neg') or 'negative' in sv:
+                        return 'Negative'
+                    return 'Neutral'
+
+                def map_hate(h):
+                    if not h:
+                        return 'Safe Content'
+                    hv = str(h).strip().lower()
+                    if hv.startswith('hate') or 'hate' in hv or hv in ('offensive','abusive'):
+                        return 'Hate Speech'
+                    return 'Safe Content'
+
+                analyzed.append({
+                    'username': c.get('username') or 'Anonymous',
+                    'text': text,
+                    'date': c.get('date'),
+                    'sentiment': map_sent(sent),
+                    'hate_speech': map_hate(hate_raw)
+                })
+
+            if not analyzed:
+                results = {'error': 'No comments returned or parsed from Apify dataset.'}
+            else:
+                kpis = calculate_kpis(analyzed) if 'calculate_kpis' in globals() else {}
+                timeline_data = prepare_timeline_data(analyzed) if 'prepare_timeline_data' in globals() else {}
+                insights = generate_insights(analyzed) if 'generate_insights' in globals() else []
+                results = {
+                    'total_comments': len(analyzed),
+                    'analyzed_comments': analyzed,
+                    'kpis': kpis,
+                    'timeline_data': timeline_data,
+                    'insights': insights,
+                    'error': None,
+                    'sentiment_distribution': {
+                        'Positive': sum(1 for c in analyzed if c.get('sentiment') == 'Positive'),
+                        'Neutral':  sum(1 for c in analyzed if c.get('sentiment') == 'Neutral'),
+                        'Negative': sum(1 for c in analyzed if c.get('sentiment') == 'Negative'),
+                    },
+                    'hate_distribution': {
+                        'Safe Content': sum(1 for c in analyzed if c.get('hate_speech') == 'Safe Content'),
+                        'Hate Speech':  sum(1 for c in analyzed if c.get('hate_speech') == 'Hate Speech'),
+                    }
+                }
+                import json as _json
+                results_json = _json.dumps(results)
+
+        except Exception as e:
+            results = {'error': f'Failed to fetch or analyze comments: {e}'}
+
+    return render_template('instagram_analysis.html', results=results, results_json=results_json)
+
+
+# -----------------------
+# Public demo route (no login) — renders example results so the UI can be checked quickly
+# -----------------------
+@app.route('/instagram_demo')
+def instagram_demo():
+    # Small mocked results payload matching the expected schema
+    sample = {
+        'total_comments': 6,
+        'analyzed_comments': [
+            {'username': 'alice', 'text': 'Love this!', 'date': '2025-09-01T12:00:00Z', 'sentiment': 'Positive', 'hate_speech': 'Safe Content'},
+            {'username': 'bob', 'text': 'This is awful', 'date': '2025-09-02T13:00:00Z', 'sentiment': 'Negative', 'hate_speech': 'Hate Speech'},
+            {'username': 'carol', 'text': 'Meh', 'date': '2025-09-03T14:00:00Z', 'sentiment': 'Neutral', 'hate_speech': 'Safe Content'},
+            {'username': 'dan', 'text': 'You are stupid', 'date': '2025-09-04T15:00:00Z', 'sentiment': 'Negative', 'hate_speech': 'Hate Speech'},
+            {'username': 'erin', 'text': 'Amazing effort', 'date': '2025-09-05T16:00:00Z', 'sentiment': 'Positive', 'hate_speech': 'Safe Content'},
+            {'username': 'frank', 'text': 'Not great', 'date': '2025-09-06T17:00:00Z', 'sentiment': 'Negative', 'hate_speech': 'Safe Content'},
+        ],
+        'kpis': {'hate_speech_pct': 33.3, 'positive_pct': 33.3},
+        'timeline_data': {
+            'labels': ['2025-09-01','2025-09-02','2025-09-03'],
+            'datasets': {'positive':[1,0,1],'neutral':[0,1,0],'negative':[0,1,1]}
+        },
+        'insights': ['Mock insight 1', 'Mock insight 2']
+    }
+    import json as _json
+    return render_template('instagram_analysis.html', results=sample, results_json=_json.dumps(sample))
 
 # -----------------------
 # API Routes

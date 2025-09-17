@@ -135,59 +135,6 @@ function initializeCharts(data) {
       });
       sentimentDist = counts;
     }
-    if ((!hateDist || Object.keys(hateDist).length === 0) && Array.isArray(data?.analyzed_comments)) {
-      const counts = { 'Safe Content': 0, 'Hate Speech': 0 };
-      data.analyzed_comments.forEach(c => {
-        const h = (c && c.hate_speech) ? String(c.hate_speech).toLowerCase() : 'safe';
-        if (h.startsWith('hate')) counts['Hate Speech']++; else counts['Safe Content']++;
-      });
-      hateDist = counts;
-    }
-
-    // 3) Timeline: prefer server-provided timeline_data
-    if (data && data.timeline_data && typeof data.timeline_data === 'object') {
-      timelineObj = data.timeline_data;
-    } else if (Array.isArray(data?.analyzed_comments)) {
-      const byDate = {};
-      data.analyzed_comments.forEach(c => {
-        const d = ((c && c.date) ? String(c.date) : '').split('T')[0] || new Date().toISOString().split('T')[0];
-        if (!byDate[d]) byDate[d] = { Positive: 0, Neutral: 0, Negative: 0 };
-        const s = (c && c.sentiment) ? String(c.sentiment).toLowerCase() : 'neutral';
-        if (s.startsWith('pos') || s.includes('positive')) byDate[d].Positive++;
-        else if (s.startsWith('neg') || s.includes('negative')) byDate[d].Negative++;
-        else byDate[d].Neutral++;
-      });
-      const labels = Object.keys(byDate).sort();
-      timelineObj = {
-        labels,
-        datasets: {
-          positive: labels.map(l => byDate[l].Positive),
-          neutral: labels.map(l => byDate[l].Neutral),
-          negative: labels.map(l => byDate[l].Negative)
-        }
-      };
-    }
-
-    // Diagnostics to help identify empty charts
-    try {
-      console.log('[YouTubeAnalysis] parsed results:', {
-        total: data?.total_comments,
-        kpis: data?.kpis,
-        sentiment_distribution: sentimentDist,
-        hate_distribution: hateDist,
-        timeline_labels: timelineObj?.labels?.length || 0
-      });
-    } catch (_) {}
-
-    // Ensure non-empty values so Chart.js draws something
-    const sum = obj => Object.values(obj || {}).reduce((a,b)=>a+(Number(b)||0),0);
-    if (sum(sentimentDist) === 0 && (Array.isArray(data?.analyzed_comments) && data.analyzed_comments.length > 0)) {
-      // default everyone to Neutral to visualize counts
-      sentimentDist = { Positive: 0, Neutral: data.analyzed_comments.length, Negative: 0 };
-    }
-    if (sum(hateDist) === 0 && (Array.isArray(data?.analyzed_comments) && data.analyzed_comments.length > 0)) {
-      hateDist = { 'Safe Content': data.analyzed_comments.length, 'Hate Speech': 0 };
-    }
     if (!timelineObj || !Array.isArray(timelineObj.labels) || timelineObj.labels.length === 0) {
       // create single bucket based on distributions, if any
       timelineObj = {
@@ -392,41 +339,111 @@ function createTimelineChart(timeline) {
 
   if (!timeline || !timeline.labels || !timeline.datasets) return;
 
-  // Expect datasets: { total:[], hate:[] }
-  const total = (timeline.datasets.total||[]);
-  const hate = (timeline.datasets.hate||[]);
+  // If we have positive/neutral/negative series, draw stacked bars per date.
+  const labels = timeline.labels || [];
+  const ds = timeline.datasets || {};
+
+  // Helper to safely read arrays
+  const arr = k => Array.isArray(ds[k]) ? ds[k] : [];
+
+  const hasPNN = (arr('positive').length === labels.length && arr('neutral').length === labels.length && arr('negative').length === labels.length);
+
+  if (hasPNN) {
+    // Use thin stacked bars with colors matching the requested design: green, grey, red.
+    timelineChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Positive',
+            data: arr('positive'),
+            backgroundColor: '#26d07e', // bright green (matches image)
+            stack: 'sentiment'
+          },
+          {
+            label: 'Neutral',
+            data: arr('neutral'),
+            backgroundColor: '#9ea3a8', // neutral grey
+            stack: 'sentiment'
+          },
+          {
+            label: 'Negative',
+            data: arr('negative'),
+            backgroundColor: '#ff5c57', // vivid red
+            stack: 'sentiment'
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'top',
+            labels: {
+              color: getCSSVariable('--text-secondary') || '#fff',
+              boxWidth: 12,
+              padding: 8
+            }
+          },
+          tooltip: {
+            mode: 'index',
+            intersect: false,
+            backgroundColor: 'rgba(0,0,0,0.8)',
+            titleColor: '#fff',
+            bodyColor: '#fff',
+            footerColor: '#fff'
+          }
+        },
+        interaction: { mode: 'index', intersect: false },
+        scales: {
+          x: {
+            stacked: true,
+            grid: { color: 'rgba(255,255,255,0.02)' },
+            ticks: {
+              color: getCSSVariable('--text-secondary') || '#ccc',
+              maxTicksLimit: 14,
+              autoSkip: true,
+              maxRotation: 45,
+              minRotation: 30,
+              callback: function(value, index) {
+                const max = 20;
+                if (this.getLabelForValue) {
+                  if (labels.length > max && index % Math.ceil(labels.length / max) !== 0) return '';
+                  return this.getLabelForValue(value);
+                }
+                return value;
+              }
+            },
+            categoryPercentage: 0.5,
+            barPercentage: 0.9
+          },
+          y: {
+            stacked: true,
+            beginAtZero: true,
+            ticks: { color: getCSSVariable('--text-secondary') || '#ccc' },
+            grid: { color: 'rgba(255,255,255,0.06)' }
+          }
+        },
+  elements: { bar: { borderWidth: 0, maxBarThickness: 10, borderRadius: 3 } },
+        layout: { padding: { top: 8, bottom: 4 } }
+      }
+    });
+    return;
+  }
+
+  // Fallback: draw grouped bars for Total and Hate
+  const total = Array.isArray(ds.total) ? ds.total : [];
+  const hate = Array.isArray(ds.hate) ? ds.hate : [];
 
   timelineChart = new Chart(ctx, {
-    type: 'line',
+    type: 'bar',
     data: {
-      labels: timeline.labels,
+      labels,
       datasets: [
-        {
-          label: 'Total Comments',
-          data: total,
-          borderColor: '#8a2be2',
-          backgroundColor: 'rgba(138,43,226,0.15)',
-          borderWidth: 3,
-          tension: 0.35,
-          pointRadius: 4,
-          pointBackgroundColor: '#8a2be2',
-          pointBorderColor: '#fff',
-          pointBorderWidth: 1,
-          fill: false
-        },
-        {
-          label: 'Hate Speech Comments',
-          data: hate,
-          borderColor: '#e74c3c',
-          backgroundColor: 'rgba(231,76,60,0.15)',
-          borderWidth: 3,
-          tension: 0.35,
-          pointRadius: 4,
-          pointBackgroundColor: '#e74c3c',
-          pointBorderColor: '#fff',
-          pointBorderWidth: 1,
-          fill: false
-        }
+        { label: 'Total Comments', data: total, backgroundColor: '#8a2be2', borderRadius: 6 },
+        { label: 'Hate Speech', data: hate, backgroundColor: '#e74c3c', borderRadius: 6 }
       ]
     },
     options: {
@@ -438,15 +455,8 @@ function createTimelineChart(timeline) {
       },
       interaction: { mode: 'index', intersect: false },
       scales: {
-        x: {
-          ticks: { color: getCSSVariable('--text-secondary') || '#ccc', maxTicksLimit: 12 },
-          grid: { color: 'rgba(255,255,255,0.06)' }
-        },
-        y: {
-          beginAtZero: true,
-          ticks: { color: getCSSVariable('--text-secondary') || '#ccc' },
-          grid: { color: 'rgba(255,255,255,0.06)' }
-        }
+        x: { ticks: { color: getCSSVariable('--text-secondary') || '#ccc', maxTicksLimit: 12 }, grid: { color: 'rgba(255,255,255,0.02)' } },
+        y: { beginAtZero: true, ticks: { color: getCSSVariable('--text-secondary') || '#ccc' }, grid: { color: 'rgba(255,255,255,0.06)' } }
       }
     }
   });

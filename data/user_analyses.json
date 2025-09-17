@@ -1,0 +1,16 @@
+{
+  "f436ee1a-3b89-4f73-9bf8-9a5b8ec13ae0": [
+    {
+      "source": "youtube",
+      "kpis": {
+        "total_comments": 284,
+        "hate_speech_pct": 3.5,
+        "positive_pct": 15.8,
+        "negative_pct": 2.5,
+        "neutral_pct": 81.7,
+        "most_active_day": "2025-04-03"
+      },
+      "total_comments": 284
+    }
+  ]
+}

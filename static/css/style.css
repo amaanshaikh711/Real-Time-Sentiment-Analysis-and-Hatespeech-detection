@@ -13,7 +13,7 @@ a, a:visited, a:active, a:focus, a:hover, button, .btn, .analyze-btn, .sidebar-l
 /* =============== CSS VARIABLES =============== */
 :root {
   --sidebar-width: 220px;
-  --sidebar-collapsed-width: 64px;
+  --sidebar-collapsed-width: 76px;
   --navbar-height: 60px;
   
   /* Dark mode colors (default) */
@@ -63,8 +63,8 @@ a, a:visited, a:active, a:focus, a:hover, button, .btn, .analyze-btn, .sidebar-l
   --accent-color: #C0C0C0; /* Metallic Silver */
   --text-color: #1F2937; /* Charcoal Black */
   --card-bg: linear-gradient(135deg, #ffffff, #f5f5f5);
-  --sidebar-bg: linear-gradient(135deg, #4B0082, #6a0dad);
-  --navbar-bg: linear-gradient(135deg, #4B0082, #a37cf0);
+  --sidebar-bg: linear-gradient(135deg, #fefeff, #e9e9ea);
+  /* --navbar-bg: linear-gradient(135deg, #4B0082, #a37cf0); */
 }
 
 /* =============== BASE STYLES =============== */
@@ -599,7 +599,7 @@ a:hover {
 }
 
 #sidebar.w-16 {
-  width: 64px;
+  width: 76px;
 }
 
 #sidebar.w-16 .sidebar-label {
@@ -611,6 +611,15 @@ a:hover {
   padding: 12px 8px;
   position: relative;
   overflow: visible !important;
+}
+
+/* Keep custom SVG icon sizes consistent even when collapsed */
+.sidebar-icon {
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+  min-height: 32px !important;
+  flex: 0 0 32px !important;
 }
 
 #sidebar.w-16 .sidebar-link:hover {
@@ -659,7 +668,7 @@ a:hover {
 }
 
 #main-content.ml-16 {
-  margin-left: 64px;
+  margin-left: 76px;
 }
 
 /* =============== BODY AND CONTAINER FIXES =============== */

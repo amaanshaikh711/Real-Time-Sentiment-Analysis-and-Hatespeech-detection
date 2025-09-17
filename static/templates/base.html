@@ -108,6 +108,7 @@
       <a href="{{ url_for('home') }}" class="nav-link">🏠 Home</a>
       <a href="{{ url_for('input_page') }}" class="nav-link">🔍 Analyzer</a>
       <a href="{{ url_for('youtube_analysis') }}" class="nav-link">▶️ YouTube</a>
+  <a href="{{ url_for('instagram_analysis') }}" class="nav-link">📸 Instagram</a>
       <a href="{{ url_for('about') }}" class="nav-link">📘 About</a>
       <a href="{{ url_for('contact') }}" class="nav-link">📞 Contact</a>
       <a href="{{ url_for('blog') }}" class="nav-link">📰 Blog</a>
@@ -132,17 +133,18 @@
       {% include 'sidebar.html' %}
     {% endif %}
 
+    
     <!-- Main Column: content + footer -->
     <div class="main-column flex flex-col flex-1 min-h-0">
       <main id="main-content" class="flex-1 p-2 transition-all duration-300 {% if not hide_sidebar|default(false) %}ml-56{% endif %} overflow-y-auto">
-        {% block content %}{% endblock %}
+       
       </main>
       {% if not hide_sidebar|default(false) %}
-        {% include 'footer.html' %}
+        <!-- {% include 'footer.html' %} -->
       {% endif %}
     </div>
   </div>
-
+   {% block content %}{% endblock %}
   <!-- Sidebar Toggle Script -->
   <script>
     const toggleBtn = document.getElementById('toggleSidebar');

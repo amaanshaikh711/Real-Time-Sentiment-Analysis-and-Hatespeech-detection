@@ -398,6 +398,27 @@ pytest utils/test_cleaning.py
 - [ ] Navigation works on all pages
 - [ ] Text analysis produces results
 - [ ] Charts display properly
+
+---
+
+## 📸 Instagram Analysis (Apify)
+
+The project includes an Instagram comments scraping integration using Apify's "instagram-comment-scraper" actor. To enable the feature:
+
+1. Create an Apify account and get your API token: https://my.apify.com/account
+2. Add the token to your environment (recommended in a `.env` file):
+
+```env
+APIFY_TOKEN=your_apify_token_here
+```
+
+3. Install dependencies and start the app (see Installation & Setup above). The `apify-client` package has been added to `requirements.txt`.
+
+4. Open the app, log in, and navigate to "Instagram Analysis" in the sidebar. Paste one or more Instagram post/reel URLs (one per line) and click "Fetch Comments". The app will fetch comments and run sentiment + hate speech analysis using the project's existing models.
+
+Notes:
+- The scraper relies on the Apify actor and may be subject to rate limits or Apify account constraints.
+- You can adjust results limit in the form. For production use, secure the APIFY_TOKEN and do not commit it to source control.
 - [ ] Mobile responsiveness
 - [ ] Export functionality
 - [ ] Error handling

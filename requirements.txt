@@ -119,3 +119,4 @@ scikit-learn==1.4.2
 plotly==5.22.0
 kaggle==1.6.14
 python-dotenv==1.0.1
+apify-client==1.0.0
