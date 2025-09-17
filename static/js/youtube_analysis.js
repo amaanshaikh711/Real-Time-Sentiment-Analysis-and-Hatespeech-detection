@@ -330,6 +330,138 @@ function createHateChart(dist) {
   });
 }
 
+// function createTimelineChart(timeline) {
+//   const canvas = document.getElementById('timelineChart');
+//   if (!canvas) return;
+//   if (timelineChart && typeof timelineChart.destroy === 'function') timelineChart.destroy();
+//   const ctx = canvas.getContext ? canvas.getContext('2d') : null;
+//   if (!ctx) return;
+
+//   if (!timeline || !timeline.labels || !timeline.datasets) return;
+
+//   // If we have positive/neutral/negative series, draw stacked bars per date.
+//   const labels = timeline.labels || [];
+//   const ds = timeline.datasets || {};
+
+//   // Helper to safely read arrays
+//   const arr = k => Array.isArray(ds[k]) ? ds[k] : [];
+
+//   const hasPNN = (arr('positive').length === labels.length && arr('neutral').length === labels.length && arr('negative').length === labels.length);
+
+//   if (hasPNN) {
+//     // Use thin stacked bars with colors matching the requested design: green, grey, red.
+//     timelineChart = new Chart(ctx, {
+//       type: 'bar',
+//       data: {
+//         labels,
+//         datasets: [
+//           {
+//             label: 'Positive',
+//             data: arr('positive'),
+//             backgroundColor: '#26d07e', // bright green (matches image)
+//             stack: 'sentiment'
+//           },
+//           {
+//             label: 'Neutral',
+//             data: arr('neutral'),
+//             backgroundColor: '#9ea3a8', // neutral grey
+//             stack: 'sentiment'
+//           },
+//           {
+//             label: 'Negative',
+//             data: arr('negative'),
+//             backgroundColor: '#ff5c57', // vivid red
+//             stack: 'sentiment'
+//           }
+//         ]
+//       },
+//       options: {
+//         responsive: true,
+//         maintainAspectRatio: false,
+//         plugins: {
+//           legend: {
+//             position: 'top',
+//             labels: {
+//               color: getCSSVariable('--text-secondary') || '#fff',
+//               boxWidth: 12,
+//               padding: 8
+//             }
+//           },
+//           tooltip: {
+//             mode: 'index',
+//             intersect: false,
+//             backgroundColor: 'rgba(0,0,0,0.8)',
+//             titleColor: '#fff',
+//             bodyColor: '#fff',
+//             footerColor: '#fff'
+//           }
+//         },
+//         interaction: { mode: 'index', intersect: false },
+//         scales: {
+//           x: {
+//             stacked: true,
+//             grid: { color: 'rgba(255,255,255,0.02)' },
+//             ticks: {
+//               color: getCSSVariable('--text-secondary') || '#ccc',
+//               maxTicksLimit: 14,
+//               autoSkip: true,
+//               maxRotation: 45,
+//               minRotation: 30,
+//               callback: function(value, index) {
+//                 const max = 20;
+//                 if (this.getLabelForValue) {
+//                   if (labels.length > max && index % Math.ceil(labels.length / max) !== 0) return '';
+//                   return this.getLabelForValue(value);
+//                 }
+//                 return value;
+//               }
+//             },
+//             categoryPercentage: 0.5,
+//             barPercentage: 0.9
+//           },
+//           y: {
+//             stacked: true,
+//             beginAtZero: true,
+//             ticks: { color: getCSSVariable('--text-secondary') || '#ccc' },
+//             grid: { color: 'rgba(255,255,255,0.06)' }
+//           }
+//         },
+//   elements: { bar: { borderWidth: 0, maxBarThickness: 10, borderRadius: 3 } },
+//         layout: { padding: { top: 8, bottom: 4 } }
+//       }
+//     });
+//     return;
+//   }
+
+//   // Fallback: draw grouped bars for Total and Hate
+//   const total = Array.isArray(ds.total) ? ds.total : [];
+//   const hate = Array.isArray(ds.hate) ? ds.hate : [];
+
+//   timelineChart = new Chart(ctx, {
+//     type: 'bar',
+//     data: {
+//       labels,
+//       datasets: [
+//         { label: 'Total Comments', data: total, backgroundColor: '#FFFFFF', borderRadius: 6 },
+//         { label: 'Hate Speech', data: hate, backgroundColor: '#e74c3c', borderRadius: 6 }
+//       ]
+//     },
+//     options: {
+//       responsive: true,
+//       maintainAspectRatio: false,
+//       plugins: {
+//         legend: { position: 'top', labels: { color: getCSSVariable('--text-secondary') || '#fff' } },
+//         tooltip: { mode: 'index', intersect: false }
+//       },
+//       interaction: { mode: 'index', intersect: false },
+//       scales: {
+//         x: { ticks: { color: getCSSVariable('--text-secondary') || '#ccc', maxTicksLimit: 12 }, grid: { color: 'rgba(255,255,255,0.02)' } },
+//         y: { beginAtZero: true, ticks: { color: getCSSVariable('--text-secondary') || '#ccc' }, grid: { color: 'rgba(255,255,255,0.06)' } }
+//       }
+//     }
+//   });
+// }
+
 function createTimelineChart(timeline) {
   const canvas = document.getElementById('timelineChart');
   if (!canvas) return;
@@ -339,128 +471,61 @@ function createTimelineChart(timeline) {
 
   if (!timeline || !timeline.labels || !timeline.datasets) return;
 
-  // If we have positive/neutral/negative series, draw stacked bars per date.
   const labels = timeline.labels || [];
   const ds = timeline.datasets || {};
 
-  // Helper to safely read arrays
-  const arr = k => Array.isArray(ds[k]) ? ds[k] : [];
+  // Make sure arrays exist
+  const total = Array.isArray(ds.total) ? ds.total : new Array(labels.length).fill(0);
+  const hate = Array.isArray(ds.hate) ? ds.hate : new Array(labels.length).fill(0);
 
-  const hasPNN = (arr('positive').length === labels.length && arr('neutral').length === labels.length && arr('negative').length === labels.length);
-
-  if (hasPNN) {
-    // Use thin stacked bars with colors matching the requested design: green, grey, red.
-    timelineChart = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels,
-        datasets: [
-          {
-            label: 'Positive',
-            data: arr('positive'),
-            backgroundColor: '#26d07e', // bright green (matches image)
-            stack: 'sentiment'
-          },
-          {
-            label: 'Neutral',
-            data: arr('neutral'),
-            backgroundColor: '#9ea3a8', // neutral grey
-            stack: 'sentiment'
-          },
-          {
-            label: 'Negative',
-            data: arr('negative'),
-            backgroundColor: '#ff5c57', // vivid red
-            stack: 'sentiment'
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            position: 'top',
-            labels: {
-              color: getCSSVariable('--text-secondary') || '#fff',
-              boxWidth: 12,
-              padding: 8
-            }
-          },
-          tooltip: {
-            mode: 'index',
-            intersect: false,
-            backgroundColor: 'rgba(0,0,0,0.8)',
-            titleColor: '#fff',
-            bodyColor: '#fff',
-            footerColor: '#fff'
-          }
-        },
-        interaction: { mode: 'index', intersect: false },
-        scales: {
-          x: {
-            stacked: true,
-            grid: { color: 'rgba(255,255,255,0.02)' },
-            ticks: {
-              color: getCSSVariable('--text-secondary') || '#ccc',
-              maxTicksLimit: 14,
-              autoSkip: true,
-              maxRotation: 45,
-              minRotation: 30,
-              callback: function(value, index) {
-                const max = 20;
-                if (this.getLabelForValue) {
-                  if (labels.length > max && index % Math.ceil(labels.length / max) !== 0) return '';
-                  return this.getLabelForValue(value);
-                }
-                return value;
-              }
-            },
-            categoryPercentage: 0.5,
-            barPercentage: 0.9
-          },
-          y: {
-            stacked: true,
-            beginAtZero: true,
-            ticks: { color: getCSSVariable('--text-secondary') || '#ccc' },
-            grid: { color: 'rgba(255,255,255,0.06)' }
-          }
-        },
-  elements: { bar: { borderWidth: 0, maxBarThickness: 10, borderRadius: 3 } },
-        layout: { padding: { top: 8, bottom: 4 } }
-      }
-    });
-    return;
-  }
-
-  // Fallback: draw grouped bars for Total and Hate
-  const total = Array.isArray(ds.total) ? ds.total : [];
-  const hate = Array.isArray(ds.hate) ? ds.hate : [];
-
+  // ✅ Show only Total Comments and Hate Speech
   timelineChart = new Chart(ctx, {
     type: 'bar',
     data: {
       labels,
       datasets: [
-        { label: 'Total Comments', data: total, backgroundColor: '#8a2be2', borderRadius: 6 },
-        { label: 'Hate Speech', data: hate, backgroundColor: '#e74c3c', borderRadius: 6 }
+        {
+          label: 'Total Comments',
+          data: total,
+          backgroundColor: '#D3D3D3', // blue
+          borderRadius: 6
+        },
+        {
+          label: 'Hate Speech',
+          data: hate,
+          backgroundColor: '#e74c3c', // red
+          borderRadius: 6
+        }
       ]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { position: 'top', labels: { color: getCSSVariable('--text-secondary') || '#fff' } },
+        legend: {
+          position: 'top',
+          labels: { color: getCSSVariable('--text-secondary') || '#fff' }
+        },
         tooltip: { mode: 'index', intersect: false }
       },
       interaction: { mode: 'index', intersect: false },
       scales: {
-        x: { ticks: { color: getCSSVariable('--text-secondary') || '#ccc', maxTicksLimit: 12 }, grid: { color: 'rgba(255,255,255,0.02)' } },
-        y: { beginAtZero: true, ticks: { color: getCSSVariable('--text-secondary') || '#ccc' }, grid: { color: 'rgba(255,255,255,0.06)' } }
-      }
+        x: {
+          ticks: { color: getCSSVariable('--text-secondary') || '#ccc', maxTicksLimit: 12 },
+          grid: { color: 'rgba(255,255,255,0.02)' }
+        },
+        y: {
+          beginAtZero: true,
+          ticks: { color: getCSSVariable('--text-secondary') || '#ccc' },
+          grid: { color: 'rgba(255,255,255,0.06)' }
+        }
+      },
+      elements: { bar: { borderWidth: 0, maxBarThickness: 20, borderRadius: 4 } },
+      layout: { padding: { top: 8, bottom: 4 } }
     }
   });
 }
+
 
 // Export to template
 window.initializeCharts = initializeCharts;
