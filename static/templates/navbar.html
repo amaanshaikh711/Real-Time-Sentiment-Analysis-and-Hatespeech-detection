@@ -1,4 +1,4 @@
-<header class="text-white body-font shadow-lg" style="background-color: var(--bg-navbar); position: fixed; top: 0; left: 0; right: 0; z-index: 1001; transition: background-color 0.3s ease;">
+<header class="hidden md:block text-white body-font shadow-lg" style="background-color: var(--bg-navbar); position: fixed; top: 0; left: 0; right: 0; z-index: 1001; transition: background-color 0.3s ease;">
   <div class="w-full flex flex-wrap px-4 py-3 items-center justify-between">
     
     <!-- Logo + Title -->
@@ -9,12 +9,7 @@
       <span class="ml-3 text-xl font-bold">HateSense AI</span>
     </a>
 
-    <!-- Mobile Menu Button -->
-    <button id="mobileMenuToggle" class="md:hidden flex items-center px-3 py-2 border rounded text-white border-white hover:bg-indigo-700">
-      <svg class="fill-current h-5 w-5" viewBox="0 0 20 20">
-        <path d="M0 3h20v2H0V3zm0 6h20v2H0V9zm0 6h20v2H0v-2z"/>
-      </svg>
-    </button>
+    <!-- Mobile Menu Button removed from here to avoid duplicate ID; mobile toggle lives in base.html -->
 
     <!-- Right side actions -->
     <nav class="hidden md:flex items-center space-x-3">

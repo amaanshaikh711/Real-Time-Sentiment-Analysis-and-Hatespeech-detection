@@ -813,7 +813,7 @@ body {
     right: 0;
     background: rgba(17, 17, 41, 0.95);
     backdrop-filter: blur(10px);
-    z-index: 1000;
+    z-index: 1102; /* sit above desktop header */
     padding: 0.5rem 1rem;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
   align-items: center;
@@ -857,6 +857,7 @@ body {
     padding: 0.5rem;
     border-radius: 5px;
     transition: all 0.3s ease;
+    z-index: 1103; /* ensure toggle icon sits above header */
   }
   
   .mobile-menu-toggle:hover {

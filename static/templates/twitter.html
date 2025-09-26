@@ -143,7 +143,7 @@ document.getElementById('startAnalysis').addEventListener('click', async functio
     }
     // update UI
     const list = document.getElementById('tweetsList'); list.innerHTML = '';
-    (json.tweets || []).forEach(t=>{ const el = document.createElement('div'); el.className='tweet-card'; el.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;"><div style="max-width:85%">${t.text}</div><div><span class='sentiment-badge'>${t.sentiment}</span></div></div><div style='margin-top:8px;color:#9aa1ad;font-size:13px'>${t.username||''}</div>`; list.appendChild(el); });
+  (json.tweets || []).forEach(t=>{ const el = document.createElement('div'); el.className='tweet-card'; el.innerHTML = `<div style="display:flex;align-items:center;"><div style="max-width:100%">${t.text}</div></div><div style='margin-top:8px;color:#9aa1ad;font-size:13px'>${t.username||''}</div>`; list.appendChild(el); });
     // summary
     document.querySelectorAll('.summary-card')[0].querySelector('div').textContent = json.summary.total || 0;
     document.querySelectorAll('.summary-card')[1].querySelector('div').textContent = (json.summary.hate_pct||0) + '%';

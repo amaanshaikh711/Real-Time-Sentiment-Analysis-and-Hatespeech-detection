@@ -192,14 +192,7 @@
                         </div>
                     </div>
                     <div class="comment-text">{{ comment.get('text', 'No text available.') }}</div>
-                    <div class="comment-analysis">
-                        <span class="sentiment-badge sentiment-{{ comment.get('sentiment', 'neutral').lower() }}">
-                            {{ comment.get('sentiment', 'Neutral') }}
-                        </span>
-                        <span class="hate-badge {% if comment.get('hate_speech') == 'Hate Speech' %}hate-detected{% else %}safe-content{% endif %}">
-                            {{ comment.get('hate_speech', 'Safe Content') }}
-                        </span>
-                    </div>
+          <!-- Removed sentiment/hate badges to show raw comment only -->
                 </div>
                 {% endif %}
                 {% endfor %}
