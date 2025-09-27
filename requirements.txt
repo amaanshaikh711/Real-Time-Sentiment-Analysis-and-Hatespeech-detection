@@ -1,8 +1,8 @@
-# Core build tools (must be first to avoid version conflicts on Render)
-pip>=25.2
-setuptools>=75.5.0
-wheel>=0.45.1
-Cython>=3.0.8
+# Core build tools (stable versions for ML libs)
+pip==25.1.1
+setuptools==70.0.0
+wheel==0.41.2
+Cython==3.0.10
 
 # Web framework
 Flask==3.1.1
@@ -44,13 +44,6 @@ python-dateutil==2.9.0.post0
 pytz==2024.2
 tzdata==2024.2
 six==1.16.0
-
-# Jupyter & Dev (optional for local, safe for Render too)
-jupyter==1.1.1
-notebook==7.2.2
-ipykernel==6.29.5
-ipywidgets==8.1.5
-jupyterlab==4.2.5
 
 # Security / misc
 argon2-cffi==23.1.0
