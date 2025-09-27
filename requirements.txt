@@ -1,32 +1,27 @@
-# Core build tools (stable versions for ML libs)
+# Core build tools
 pip==25.1.1
 setuptools==70.0.0
 wheel==0.41.2
 Cython==3.0.10
 
-# Web framework
-Flask==3.1.1
-Flask-SocketIO==5.5.1
-Werkzeug==3.1.3
-gunicorn==21.2.0
-
 # Data & ML
 numpy==1.26.4
-pandas==2.2.3
 scikit-learn==1.4.2
 scipy==1.12.0
+pandas==2.2.3
 nltk==3.9.1
 joblib==1.5.1
 regex==2024.11.6
 tqdm==4.67.1
 
-# Visualization
-plotly==5.22.0
-
-# Google / APIs
-google-api-python-client==2.108.0
+# Web & API
+Flask==3.1.1
+Flask-SocketIO==5.5.1
+Werkzeug==3.1.3
+gunicorn==21.2.0
 requests==2.32.3
 urllib3==2.2.3
+google-api-python-client==2.108.0
 apify-client==1.0.0
 kaggle==1.6.14
 python-dotenv==1.0.1
@@ -45,7 +40,7 @@ pytz==2024.2
 tzdata==2024.2
 six==1.16.0
 
-# Security / misc
+# Security
 argon2-cffi==23.1.0
 argon2-cffi-bindings==21.2.0
 bleach==6.2.0
@@ -54,3 +49,6 @@ MarkupSafe==3.0.2
 certifi==2024.8.30
 charset-normalizer==3.4.0
 idna==3.10
+
+# Visualization
+plotly==5.22.0
