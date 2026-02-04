@@ -1,31 +1,88 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>HateSense AI</title>
-  
+
   <!-- Favicon -->
   <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
   <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32x32.png') }}">
   <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicon-16x16.png') }}">
   <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
   <link rel="manifest" href="{{ url_for('static', filename='site.webmanifest') }}">
-  
+
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/home-style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile-responsive.css') }}">
+
+  <!-- Clerk SDK -->
+  {% if clerk_publishable_key %}
+  <script crossorigin="anonymous" data-clerk-publishable-key="{{ clerk_publishable_key }}"
+    src="https://cdn.jsdelivr.net/npm/@clerk/clerk-js@latest/dist/clerk.browser.js" type="text/javascript"></script>
+
+  <script>
+    window.addEventListener("load", async function () {
+      try {
+        await Clerk.load();
+
+        const signedInDiv = document.getElementById("navbar-signed-in");
+        const signedOutDiv = document.getElementById("navbar-signed-out");
+
+        // Always try to mount auth components if their containers exist
+        const signInDiv = document.getElementById("sign-in");
+        if (signInDiv) Clerk.mountSignIn(signInDiv);
+
+        const signUpDiv = document.getElementById("sign-up");
+        if (signUpDiv) Clerk.mountSignUp(signUpDiv);
+
+        const userProfileDiv = document.getElementById("user-profile");
+        if (userProfileDiv) Clerk.mountUserProfile(userProfileDiv);
+
+        // Handle Navbar State
+        if (Clerk.user) {
+          // Show signed-in nav, hide signed-out nav
+          if (signedInDiv) signedInDiv.style.display = "block";
+          if (signedOutDiv) signedOutDiv.style.display = "none";
+
+          // Mount User Button in navbar
+          const userButtonDiv = document.getElementById("user-button");
+          if (userButtonDiv) Clerk.mountUserButton(userButtonDiv);
+
+          // If on login/signup page but already logged in, redirect to home
+          if (signInDiv || signUpDiv) {
+            window.location.href = "{{ url_for('home') }}";
+          }
+
+        } else {
+          // Show signed-out nav, hide signed-in nav
+          if (signedInDiv) signedInDiv.style.display = "none";
+          if (signedOutDiv) signedOutDiv.style.display = "flex";
+        }
+      } catch (err) {
+        console.error("Clerk failed to load", err);
+      }
+    });
+  </script>
+  {% else %}
+  <script>console.warn("Clerk Publishable Key is missing - Auth disabled");</script>
+  {% endif %}
+
   <style>
     .transition-all {
       transition: all 0.3s ease;
     }
+
     .nav-link {
       position: relative;
       transition: all 0.3s ease;
     }
+
     .nav-link::after {
       content: '';
       position: absolute;
@@ -36,43 +93,49 @@
       background-color: #fff;
       transition: width 0.3s ease;
     }
+
     .nav-link:hover::after {
       width: 100%;
     }
+
     .nav-link:hover {
       transform: translateY(-2px) scale(1.05);
-      text-shadow: 0px 2px 8px rgba(255,255,255,0.4);
+      text-shadow: 0px 2px 8px rgba(255, 255, 255, 0.4);
     }
+
     .profile-btn {
       transition: all 0.3s ease;
-      box-shadow: 0px 4px 15px rgba(0,0,0,0.3);
+      box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.3);
       transform: perspective(500px) translateZ(0);
     }
+
     .profile-btn:hover {
       transform: perspective(500px) translateZ(10px) scale(1.05);
-      box-shadow: 0px 6px 20px rgba(0,0,0,0.4);
+      box-shadow: 0px 6px 20px rgba(0, 0, 0, 0.4);
     }
+
     header {
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
     }
-    
+
     /* Global theme transitions */
     * {
       transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
     }
-    
+
     /* Light mode text color adjustments */
     [data-theme="light"] {
       color: var(--text-primary);
     }
-    
+
     [data-theme="light"] .text-white {
       color: var(--text-primary) !important;
     }
-    
+
     [data-theme="light"] header {
       color: var(--text-primary);
     }
+
     #menu {
       transition: max-height 0.4s ease, opacity 0.4s ease;
       overflow: hidden;
@@ -82,16 +145,19 @@
     .auth-page .main-column {
       margin-left: 0 !important;
     }
+
     .auth-page #main-content {
       margin-left: 0 !important;
       padding-left: 0 !important;
       padding-right: 0 !important;
     }
+
     .auth-page .layout {
       padding-left: 0 !important;
     }
   </style>
 </head>
+
 <body>
 
   <!-- Mobile Navbar (hidden on desktop) -->
@@ -108,17 +174,17 @@
       <a href="{{ url_for('home') }}" class="nav-link">🏠 Home</a>
       <a href="{{ url_for('input_page') }}" class="nav-link">🔍 Analyzer</a>
       <a href="{{ url_for('youtube_analysis') }}" class="nav-link">▶️ YouTube</a>
-  <a href="{{ url_for('instagram_analysis') }}" class="nav-link">📸 Instagram</a>
+      <a href="{{ url_for('instagram_analysis') }}" class="nav-link">📸 Instagram</a>
       <a href="{{ url_for('about') }}" class="nav-link">📘 About</a>
       <a href="{{ url_for('contact') }}" class="nav-link">📞 Contact</a>
-      <a href="{{ url_for('blog') }}" class="nav-link">📰 Blog</a>
+
 
       <!-- Show Login or Logout / Profile depending on auth state -->
       {% if current_user %}
-        <a href="{{ url_for('profile') }}" class="nav-link">👤 Profile</a>
-        <a href="{{ url_for('logout') }}" class="nav-link">🔓 Logout</a>
+      <a href="{{ url_for('profile') }}" class="nav-link">👤 Profile</a>
+      <a href="{{ url_for('logout') }}" class="nav-link">🔓 Logout</a>
       {% else %}
-        <a href="{{ url_for('login') }}" class="nav-link">🔒 Login</a>
+      <a href="{{ url_for('login') }}" class="nav-link">🔒 Login</a>
       {% endif %}
     </div>
   </div>
@@ -130,19 +196,20 @@
   <div id="layoutWrapper" class="layout flex h-screen {% if hide_sidebar|default(false) %}auth-page{% endif %}">
     <!-- Sidebar (hidden on mobile and auth pages) -->
     {% if not hide_sidebar|default(false) %}
-      {% include 'sidebar.html' %}
+    {% include 'sidebar.html' %}
     {% endif %}
 
-    
+
     <!-- Main Column: content + footer -->
     <div class="main-column flex flex-col flex-1 min-h-0">
-      <main id="main-content" class="flex-1 p-2 transition-all duration-300 {% if not hide_sidebar|default(false) %}ml-56{% endif %} overflow-y-auto">
-       
-     
-   {% block content %}{% endblock %}
-    </main>
+      <main id="main-content"
+        class="flex-1 p-2 transition-all duration-300 {% if not hide_sidebar|default(false) %}ml-56{% endif %} overflow-y-auto">
+
+
+        {% block content %}{% endblock %}
+      </main>
       {% if not hide_sidebar|default(false) %}
-        {% include 'footer.html' %}
+      {% include 'footer.html' %}
       {% endif %}
     </div>
   </div>
@@ -266,7 +333,7 @@
     function setTheme(theme) {
       html.setAttribute('data-theme', theme);
       localStorage.setItem('theme', theme);
-      
+
       // Update icons
       if (theme === 'light') {
         sunIcon.classList.add('hidden');
@@ -301,4 +368,5 @@
     document.addEventListener('DOMContentLoaded', initializeTheme);
   </script>
 </body>
+
 </html>

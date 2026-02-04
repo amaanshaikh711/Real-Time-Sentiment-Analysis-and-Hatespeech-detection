@@ -2,15 +2,17 @@
 import os
 from dotenv import load_dotenv
 
-# Load .env file located next to this config.py file so env vars are available
-# regardless of the current working directory used to start the server.
+# Load .env file explicitly
 base_dir = os.path.abspath(os.path.dirname(__file__))
 dotenv_path = os.path.join(base_dir, '.env')
+
 if os.path.exists(dotenv_path):
-	load_dotenv(dotenv_path)
+    print(f"[INFO] Loading .env from {dotenv_path}")
+    load_dotenv(dotenv_path, override=True)
 else:
-	# Fallback to default loader which will search the cwd and parents
-	load_dotenv()
+    print("[WARNING] .env file not found!")
+    # Fallback
+    load_dotenv()
 
 # YouTube Data API v3 Configuration
 YOUTUBE_API_KEY = os.environ.get('YOUTUBE_API_KEY', 'AIzaSyDrJRCcmTjIWREWOOyYZUo9NYVlGwQFO1Y')
@@ -18,31 +20,39 @@ YOUTUBE_API_KEY = os.environ.get('YOUTUBE_API_KEY', 'AIzaSyDrJRCcmTjIWREWOOyYZUo
 # Flask Configuration
 SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
 
-# Supabase Configuration
-SUPABASE_URL = os.environ.get('SUPABASE_URL', 'https://tlnsqotkisihceilmnng.supabase.co')
-SUPABASE_KEY = os.environ.get('SUPABASE_KEY')
-SUPABASE_SERVICE_KEY = os.environ.get('SUPABASE_SERVICE_KEY')
+# Clerk Configuration
+# Try multiple possible key names and clean them
+def get_env_clean(key):
+    val = os.environ.get(key)
+    if val:
+        return val.strip().strip("'").strip('"')
+    return None
 
-# Other configuration settings can be added here
+CLERK_PUBLISHABLE_KEY = get_env_clean("CLERK_PUBLISHABLE_KEY") or get_env_clean("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY")
+CLERK_SECRET_KEY = get_env_clean("CLERK_SECRET_KEY")
+
+if CLERK_PUBLISHABLE_KEY:
+    print(f"[INFO] Clerk Publishable Key Found: {CLERK_PUBLISHABLE_KEY[:10]}...")
+else:
+    print("[ERROR] Clerk Publishable Key NOT found in environment variables.")
+
+# Other configuration settings
 DEBUG = os.environ.get('FLASK_ENV') == 'development'
-# Apify API token (set in environment or .env as APIFY_TOKEN)
-# Support a few common env var names and tolerant parsing in case the .env value was written like
-# "apify api key=..." or similar by the user. Strip surrounding quotes and whitespace.
+
+# Apify API token
 def _get_env_token(names):
-	for n in names:
-		v = os.environ.get(n)
-		if v:
-			v = v.strip().strip('"').strip("'")
-			# if the user pasted a key with a label like 'apify api key-<token>' try to extract last token
-			if '=' in v:
-				v = v.split('=')[-1].strip()
-			if '-' in v and v.lower().startswith('apify'):
-				# accept patterns like 'apify_api_key-<token>' or 'apify api key-<token>'
-				parts = v.split('-')
-				if len(parts) > 1:
-					v = parts[-1].strip()
-			if v:
-				return v
-	return None
+    for n in names:
+        v = os.environ.get(n)
+        if v:
+            v = v.strip().strip('"').strip("'")
+            if '=' in v:
+                v = v.split('=')[-1].strip()
+            if '-' in v and v.lower().startswith('apify'):
+                parts = v.split('-')
+                if len(parts) > 1:
+                    v = parts[-1].strip()
+            if v:
+                return v
+    return None
 
 APIFY_TOKEN = _get_env_token(['APIFY_TOKEN', 'APIFY_API_TOKEN', 'APIFY_API_KEY', 'APIFY_KEY', 'APIFY'])

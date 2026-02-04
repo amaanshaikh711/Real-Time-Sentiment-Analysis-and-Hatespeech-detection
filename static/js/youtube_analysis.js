@@ -1,5 +1,5 @@
 // youtube_analysis.js — robust + footer-hide + colors
-try { window.__YT_ANALYSIS_JS_PRESENT__ = true; } catch (_) {}
+try { window.__YT_ANALYSIS_JS_PRESENT__ = true; } catch (_) { }
 let sentimentChart = null;
 let hateChart = null;
 let timelineChart = null;
@@ -79,7 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // debug helper: show short preview of the text so we can inspect quickly
       try {
         const el2 = document.getElementById('analysis-data');
-        console.log('analysis-data preview:', (el2 && el2.textContent) ? el2.textContent.slice(0,1000) : 'no data');
+        console.log('analysis-data preview:', (el2 && el2.textContent) ? el2.textContent.slice(0, 1000) : 'no data');
       } catch (e2) { /* ignore */ }
     } finally {
       // ensure footer visible (analysis finished if page already has results)
@@ -125,16 +125,31 @@ function initializeCharts(data) {
     }
 
     // 2) Fallback: compute from analyzed_comments
-    if ((!sentimentDist || Object.keys(sentimentDist).length === 0) && Array.isArray(data?.analyzed_comments)) {
-      const counts = { Positive: 0, Neutral: 0, Negative: 0 };
-      data.analyzed_comments.forEach(c => {
-        const s = (c && c.sentiment) ? String(c.sentiment).toLowerCase() : 'neutral';
-        if (s.startsWith('pos') || s.includes('positive')) counts.Positive++;
-        else if (s.startsWith('neg') || s.includes('negative')) counts.Negative++;
-        else counts.Neutral++;
-      });
-      sentimentDist = counts;
+    if (Array.isArray(data?.analyzed_comments)) {
+      // Compute Sentiment if missing
+      if (!sentimentDist || Object.keys(sentimentDist).length === 0) {
+        const counts = { Positive: 0, Neutral: 0, Negative: 0 };
+        data.analyzed_comments.forEach(c => {
+          const s = (c && c.sentiment) ? String(c.sentiment).toLowerCase() : 'neutral';
+          if (s.startsWith('pos') || s.includes('positive')) counts.Positive++;
+          else if (s.startsWith('neg') || s.includes('negative')) counts.Negative++;
+          else counts.Neutral++;
+        });
+        sentimentDist = counts;
+      }
+
+      // Compute Hate if missing
+      if (!hateDist || Object.keys(hateDist).length === 0) {
+        const hCounts = { 'Safe Content': 0, 'Hate Speech': 0 };
+        data.analyzed_comments.forEach(c => {
+          const h = (c && c.hate_speech) ? String(c.hate_speech).toLowerCase() : 'safe';
+          if (h.startsWith('hate')) hCounts['Hate Speech']++;
+          else hCounts['Safe Content']++;
+        });
+        hateDist = hCounts;
+      }
     }
+
     if (!timelineObj || !Array.isArray(timelineObj.labels) || timelineObj.labels.length === 0) {
       // create single bucket based on distributions, if any
       timelineObj = {
@@ -157,18 +172,18 @@ function initializeCharts(data) {
       const result = { labels: [], datasets: { total: [], hate: [] } };
       if (labels.length) {
         // If we have pos/neu/neg, make totals
-        const pos = ((timelineObj.datasets||{}).positive||[]); 
-        const neu = ((timelineObj.datasets||{}).neutral||[]);
-        const neg = ((timelineObj.datasets||{}).negative||[]);
+        const pos = ((timelineObj.datasets || {}).positive || []);
+        const neu = ((timelineObj.datasets || {}).neutral || []);
+        const neg = ((timelineObj.datasets || {}).negative || []);
         result.labels = labels;
-        for (let i=0;i<labels.length;i++) {
-          const tot = (Number(pos[i]||0)+Number(neu[i]||0)+Number(neg[i]||0));
+        for (let i = 0; i < labels.length; i++) {
+          const tot = (Number(pos[i] || 0) + Number(neu[i] || 0) + Number(neg[i] || 0));
           result.datasets.total.push(tot);
           result.datasets.hate.push(0); // will improve from analyzed_comments below
         }
       }
       // If analyzed_comments available, compute hate/total per date precisely
-      if (Array.isArray(data?.analyzed_comments) && data.analyzed_comments.length>0) {
+      if (Array.isArray(data?.analyzed_comments) && data.analyzed_comments.length > 0) {
         const byDate = {};
         data.analyzed_comments.forEach(c => {
           const d = ((c && c.date) ? String(c.date) : '').split('T')[0] || new Date().toISOString().split('T')[0];
@@ -182,8 +197,8 @@ function initializeCharts(data) {
         result.datasets.total = keys.map(k => byDate[k].total);
         result.datasets.hate = keys.map(k => byDate[k].hate);
       }
-      if (!Array.isArray(result.labels) || result.labels.length===0) {
-        return { labels: ['All'], datasets: { total: [data?.total_comments||0], hate: [0] } };
+      if (!Array.isArray(result.labels) || result.labels.length === 0) {
+        return { labels: ['All'], datasets: { total: [data?.total_comments || 0], hate: [0] } };
       }
       return result;
     };
@@ -196,7 +211,7 @@ function initializeCharts(data) {
     createTimelineChart(lineTimeline);
 
     // mark as rendered to prevent duplicate drawing by inline scripts
-    try { window.__YT_ANALYSIS_JS_RENDERED__ = true; } catch (_) {}
+    try { window.__YT_ANALYSIS_JS_RENDERED__ = true; } catch (_) { }
   } catch (e) {
     console.error('Chart initialization failed', e);
   } finally {
@@ -257,7 +272,7 @@ function createSentimentChart(dist) {
         tooltip: { mode: 'index', intersect: false }
       },
       layout: { padding: { top: 10, right: 10, bottom: 10, left: 10 } }
-      ,cutout: '65%'
+      , cutout: '65%'
     }
   });
 
@@ -273,15 +288,16 @@ function createSentimentChart(dist) {
       });
       window.__SENTIMENT_RO.observe(canvas.parentElement || canvas);
     }
-  } catch (_) {}
+  } catch (_) { }
 }
 
 function createHateChart(dist) {
   const canvas = document.getElementById('hateChart');
   if (!canvas) return;
   if (hateChart && typeof hateChart.destroy === 'function') hateChart.destroy();
-  // Let Chart.js control height via aspectRatio
+  // Ensure perfect circle: let Chart.js control sizing
   _clearForcedCanvasSize(canvas);
+  _enforceSquareCanvas(canvas);
   const ctx = canvas.getContext ? canvas.getContext('2d') : null;
   if (!ctx) return;
 
@@ -297,37 +313,53 @@ function createHateChart(dist) {
         label: 'Count',
         data: values,
         backgroundColor: ['#2ecc71', '#e74c3c'],
-        borderColor: ['#1e9f52', '#c0392b'],
+        borderColor: ['#27ae60', '#c0392b'],
         borderWidth: 0,
-        borderRadius: 10,
-        maxBarThickness: 56,
-        barThickness: 'flex'
+        borderRadius: 6,
+        maxBarThickness: 60,
+        barPercentage: 0.6
       }]
     },
     options: {
       responsive: true,
-      maintainAspectRatio: true,
-      aspectRatio: 1.7,
+      maintainAspectRatio: false, // Allow filling the container height
       plugins: {
         legend: { display: false },
-        tooltip: { mode: 'index', intersect: false }
+        tooltip: {
+          mode: 'index',
+          intersect: false,
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          titleColor: '#fff',
+          bodyColor: '#fff'
+        }
       },
       scales: {
         x: {
           ticks: { color: getCSSVariable('--text-secondary') || '#ccc' },
-          grid: { display: false },
-          stacked: false
+          grid: { display: false }
         },
         y: {
           beginAtZero: true,
           ticks: { color: getCSSVariable('--text-secondary') || '#ccc' },
-          grid: { color: 'rgba(255,255,255,0.06)' }
+          grid: { color: 'rgba(255,255,255,0.05)' }
         }
-      },
-      categoryPercentage: 0.6,
-      barPercentage: 0.9
+      }
     }
   });
+
+  // Keep circle on container resize
+  try {
+    if (window.__HATE_RO && typeof window.__HATE_RO.disconnect === 'function') {
+      window.__HATE_RO.disconnect();
+    }
+    if (window.ResizeObserver) {
+      window.__HATE_RO = new ResizeObserver(() => {
+        _enforceSquareCanvas(canvas);
+        if (hateChart && typeof hateChart.resize === 'function') hateChart.resize();
+      });
+      window.__HATE_RO.observe(canvas.parentElement || canvas);
+    }
+  } catch (_) { }
 }
 
 // function createTimelineChart(timeline) {
