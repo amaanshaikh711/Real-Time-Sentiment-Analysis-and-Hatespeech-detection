@@ -1,8 +1,6 @@
 # Core build tools
-pip==25.1.1
-setuptools==70.0.0
-wheel==0.41.2
-Cython==3.0.10
+# pip, setuptools, wheel are handled by the environment
+Cython>=3.0.0
 
 # Data & ML
 numpy==1.26.4

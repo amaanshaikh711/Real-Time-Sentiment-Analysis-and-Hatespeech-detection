@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: hatesense-ai-clone
+    runtime: docker
+    plan: free
+    region: oregon 
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.0
+      - key: PORT
+        value: 10000
+      - key: SECRET_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: APIFY_TOKEN
+        sync: false
+      - key: YOUTUBE_API_KEY
+        sync: false
