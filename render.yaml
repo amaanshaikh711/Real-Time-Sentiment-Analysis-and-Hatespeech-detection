@@ -6,16 +6,10 @@ services:
     region: oregon 
     envVars:
       - key: PYTHON_VERSION
-        value: 3.10.0
+        value: 3.11.0
       - key: PORT
         value: 10000
       - key: SECRET_KEY
-        sync: false
-      - key: SUPABASE_URL
-        sync: false
-      - key: SUPABASE_KEY
-        sync: false
-      - key: SUPABASE_SERVICE_KEY
         sync: false
       - key: APIFY_TOKEN
         sync: false
